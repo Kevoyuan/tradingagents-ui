@@ -1,0 +1,10 @@
+README.md
+pyproject.toml
+trade_ui/__init__.py
+trade_ui/cli.py
+tradingagents_ui.egg-info/PKG-INFO
+tradingagents_ui.egg-info/SOURCES.txt
+tradingagents_ui.egg-info/dependency_links.txt
+tradingagents_ui.egg-info/entry_points.txt
+tradingagents_ui.egg-info/requires.txt
+tradingagents_ui.egg-info/top_level.txt

@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tradingagents-ui"
+version = "0.1.0"
+description = "Lightweight Streamlit UI for TradingAgents"
+requires-python = ">=3.10"
+dependencies = [
+    "streamlit>=1.30.0",
+    "python-dotenv>=1.0.0",
+    "tradingagents @ git+https://github.com/TauricResearch/TradingAgents.git",
+]
+
+[project.scripts]
+trade-ui = "trade_ui.cli:main"
