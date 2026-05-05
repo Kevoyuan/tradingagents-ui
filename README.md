@@ -4,13 +4,17 @@ A lightweight Streamlit web interface for [TradingAgents](https://github.com/Tau
 
 ## Screenshots
 
-| Provider setup | Live analysis monitor |
-|---|---|
-| <img src="images/trade-ui-providers.png" alt="Provider setup" width="420"> | <img src="images/trade-ui-monitor.png" alt="Live analysis monitor" width="420"> |
+### Live Analysis Monitor
 
-| Report viewer | Report history |
-|---|---|
-| <img src="images/trade-ui-report-viewer.png" alt="Report viewer" width="420"> | <img src="images/trade-ui-history-reports.png" alt="Report history" width="420"> |
+![Live analysis monitor](images/trade-ui-monitor.png)
+
+### Report Viewer
+
+![Report viewer](images/trade-ui-report-viewer.png)
+
+### Report History
+
+![Report history](images/trade-ui-history-reports.png)
 
 ## Quick Start
 
