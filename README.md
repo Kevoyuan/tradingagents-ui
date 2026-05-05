@@ -30,7 +30,7 @@ web app at `http://localhost:8501`.
 ### Setup (first time)
 
 ```bash
-git clone <this-repo-url> tradingagents-ui
+git clone https://github.com/Kevoyuan/tradingagents-ui.git
 cd tradingagents-ui
 python3 -m pip install -e .
 ```
