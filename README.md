@@ -4,24 +4,13 @@ A lightweight Streamlit web interface for [TradingAgents](https://github.com/Tau
 
 ## Screenshots
 
-<div style="display:flex;gap:16px;overflow-x:auto;padding:8px 0 16px;scroll-snap-type:x mandatory;">
-  <figure style="margin:0;flex:0 0 auto;scroll-snap-align:start;">
-    <img src="images/trade-ui-providers.png" alt="Provider setup" style="height:360px;width:auto;max-width:none;border-radius:8px;" />
-    <figcaption style="font-size:13px;color:#6b7280;margin-top:6px;">Provider setup</figcaption>
-  </figure>
-  <figure style="margin:0;flex:0 0 auto;scroll-snap-align:start;">
-    <img src="images/trade-ui-monitor.png" alt="Live analysis monitor" style="height:360px;width:auto;max-width:none;border-radius:8px;" />
-    <figcaption style="font-size:13px;color:#6b7280;margin-top:6px;">Live analysis monitor</figcaption>
-  </figure>
-  <figure style="margin:0;flex:0 0 auto;scroll-snap-align:start;">
-    <img src="images/trade-ui-report-viewer.png" alt="Report viewer" style="height:360px;width:auto;max-width:none;border-radius:8px;" />
-    <figcaption style="font-size:13px;color:#6b7280;margin-top:6px;">Report viewer</figcaption>
-  </figure>
-  <figure style="margin:0;flex:0 0 auto;scroll-snap-align:start;">
-    <img src="images/trade-ui-history-reports.png" alt="Report history" style="height:360px;width:auto;max-width:none;border-radius:8px;" />
-    <figcaption style="font-size:13px;color:#6b7280;margin-top:6px;">Report history</figcaption>
-  </figure>
-</div>
+| Provider setup | Live analysis monitor |
+|---|---|
+| <img src="images/trade-ui-providers.png" alt="Provider setup" width="420"> | <img src="images/trade-ui-monitor.png" alt="Live analysis monitor" width="420"> |
+
+| Report viewer | Report history |
+|---|---|
+| <img src="images/trade-ui-report-viewer.png" alt="Report viewer" width="420"> | <img src="images/trade-ui-history-reports.png" alt="Report history" width="420"> |
 
 ## Quick Start
 
