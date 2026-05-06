@@ -37,85 +37,160 @@ CUSTOM_CSS = """
 }
 
 [data-testid="stSidebar"] label {
-    color: #8b949e !important;
-    font-size: 0.85rem;
+    color: #8a8f98 !important; /* Linear ink-subtle */
+    font-size: 13px;
     font-weight: 500;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.02em !important; /* Linear negative tracking */
+    color: #f7f8f8 !important; /* Linear ink */
 }
 
 /* Sidebar Buttons */
 [data-testid="stSidebar"] button[kind="secondary"] {
-    background: linear-gradient(90deg, rgba(0, 255, 136, 0.1), rgba(0, 255, 136, 0.2)) !important;
-    border: 1px solid rgba(0, 255, 136, 0.4) !important;
-    color: #00ff88 !important;
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    border-radius: 6px !important;
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    background: #0f1011 !important; /* Linear surface-1 */
+    border: 1px solid #23252a !important; /* Linear hairline */
+    color: #f7f8f8 !important; /* Linear ink */
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 8px !important;
+    padding: 8px 14px !important;
+    transition: all 0.2s ease !important;
 }
 [data-testid="stSidebar"] button[kind="secondary"]:hover {
-    background: linear-gradient(90deg, rgba(0, 255, 136, 0.2), rgba(0, 255, 136, 0.3)) !important;
-    border-color: #00ff88 !important;
-    box-shadow: 0 4px 12px rgba(0, 255, 136, 0.2) !important;
-    transform: translateY(-1px);
+    background: #141516 !important; /* Linear surface-2 */
+    border-color: #34343a !important; /* Linear hairline-strong */
+    color: #ffffff !important;
 }
 [data-testid="stSidebar"] button[kind="secondary"]:active {
     transform: translateY(1px);
 }
 
-/* Sidebar Inputs and Selects */
-[data-testid="stSidebar"] div[data-baseweb="select"] > div,
-[data-testid="stSidebar"] input {
-    background-color: rgba(0, 0, 0, 0.25) !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: 6px !important;
-    color: #e6edf3 !important;
-    transition: all 0.3s ease;
+/* Primary Buttons (Run Analysis) */
+.stButton button[kind="primary"] {
+    background: #00ff88 !important; /* Using our brand color instead of Linear's primary */
+    border: 1px solid #00ff88 !important;
+    color: #010102 !important; /* Linear canvas for high contrast */
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    border-radius: 8px !important;
+    padding: 8px 14px !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 4px 16px rgba(0, 255, 136, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.4) !important;
 }
-[data-testid="stSidebar"] div[data-baseweb="select"] > div:hover,
-[data-testid="stSidebar"] input:hover {
-    border-color: rgba(0, 255, 136, 0.3) !important;
-    background-color: rgba(0, 255, 136, 0.02) !important;
+.stButton button[kind="primary"]:hover {
+    background: #33ff9f !important;
+    border-color: #33ff9f !important;
+    box-shadow: 0 6px 20px rgba(0, 255, 136, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.5) !important;
+    transform: translateY(-1px);
 }
-[data-testid="stSidebar"] div[data-baseweb="select"] > div:focus-within,
-[data-testid="stSidebar"] input:focus {
+.stButton button[kind="primary"]:active {
+    transform: translateY(1px);
+    box-shadow: none !important;
+}
+.stButton button[kind="primary"]:disabled {
+    background: rgba(0, 255, 136, 0.1) !important;
+    border-color: rgba(0, 255, 136, 0.2) !important;
+    color: rgba(255, 255, 255, 0.3) !important;
+    box-shadow: none !important;
+    transform: none;
+    cursor: not-allowed;
+}
+
+/* Global Inputs and Selects (Linear Style) */
+div[data-baseweb="select"] > div,
+div[data-baseweb="base-input"],
+textarea {
+    background-color: #0f1011 !important; /* Linear surface-1 */
+    border: 1px solid #23252a !important; /* Linear hairline */
+    border-radius: 8px !important;
+    color: #f7f8f8 !important; /* Linear ink */
+    transition: all 0.2s ease;
+}
+div[data-baseweb="select"] > div:hover,
+div[data-baseweb="base-input"]:hover,
+textarea:hover {
+    border-color: #34343a !important; /* Linear hairline-strong */
+    background-color: #141516 !important; /* Linear surface-2 */
+}
+div[data-baseweb="select"] > div:focus-within,
+div[data-baseweb="base-input"]:focus-within,
+textarea:focus {
     border-color: #00ff88 !important;
-    box-shadow: 0 0 0 1px rgba(0, 255, 136, 0.2) !important;
+    box-shadow: 0 0 0 2px rgba(0, 255, 136, 0.2) !important; /* Linear-style focus ring */
+}
+/* Ensure inner inputs have correct colors without overriding wrappers */
+input, textarea {
+    color: #f7f8f8 !important;
+}
+/* Crucial: Prevent inner input of select from showing a box */
+div[data-baseweb="select"] input {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
 }
 
 /* Expanders in Sidebar */
 [data-testid="stSidebar"] [data-testid="stExpander"] {
-    border-color: rgba(255, 255, 255, 0.05) !important;
-    background: rgba(0, 0, 0, 0.15) !important;
+    border-color: #23252a !important; /* Linear hairline */
+    background: #0f1011 !important; /* Linear surface-1 */
     border-radius: 8px !important;
 }
 [data-testid="stSidebar"] [data-testid="stExpander"] summary:hover {
-    background: rgba(0, 255, 136, 0.05) !important;
-    color: #00ff88 !important;
+    background: #141516 !important; /* Linear surface-2 */
+    color: #f7f8f8 !important;
 }
 [data-testid="stSidebar"] [data-testid="stExpander"] summary svg {
-    fill: #00ff88 !important;
+    fill: #8a8f98 !important;
 }
 
 /* Adjusted padding to prevent header overlap */
 .block-container { padding-top: 3.5rem; padding-bottom: 1rem; }
 
-/* Ensure tabs are not covered */
+/* Linear-style Tabs */
 .stTabs { margin-top: 0.5rem; }
-.stTabs [data-baseweb="tab-list"] { overflow: visible !important; }
+.stTabs [data-baseweb="tab-list"] { 
+    overflow: visible !important;
+    background-color: transparent !important;
+    border-bottom: 1px solid #23252a !important; /* Linear hairline */
+    gap: 16px;
+}
+.stTabs [data-baseweb="tab"] {
+    background-color: transparent !important;
+    border: none !important;
+    border-bottom: 2px solid transparent !important;
+    border-radius: 0 !important;
+    padding: 10px 4px !important;
+    margin-right: 8px;
+}
+.stTabs [data-baseweb="tab"][aria-selected="true"] {
+    border-bottom-color: #00ff88 !important;
+}
+button[data-baseweb="tab"] p {
+    color: #8a8f98 !important; /* Linear ink-subtle */
+    font-size: 14px !important;
+    font-weight: 500 !important;
+}
+button[data-baseweb="tab"][aria-selected="true"] p {
+    color: #f7f8f8 !important; /* Linear ink */
+    font-weight: 600 !important;
+}
+button[data-baseweb="tab"]:hover p {
+    color: #d0d6e0 !important; /* Linear ink-muted */
+}
 
-/* Panel design - Industrial Graphite with Refraction */
+/* Panel design - Linear Surface-1 Refraction */
 .panel {
-    border: 1px solid rgba(0, 255, 136, 0.15);
+    border: 1px solid #23252a !important; /* Linear hairline */
     border-radius: 12px;
     padding: 1.25rem;
     margin-bottom: 1rem;
-    background: linear-gradient(165deg, rgba(22, 27, 34, 0.85), rgba(13, 17, 23, 0.95));
-    backdrop-filter: blur(12px);
-    box-shadow:
-        0 4px 24px rgba(0, 0, 0, 0.5),
-        inset 0 1px 1px rgba(255, 255, 255, 0.05);
+    background: #0f1011 !important; /* Linear surface-1 */
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05); /* Subtle top pixel */
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     position: relative;
     overflow: hidden;
@@ -125,11 +200,11 @@ CUSTOM_CSS = """
     position: absolute;
     top: 0; left: 0; right: 0;
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.2), transparent);
+    background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.15), transparent);
 }
 .panel:hover {
-    border-color: rgba(0, 255, 136, 0.4);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+    border-color: #34343a !important; /* Linear hairline-strong */
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.08);
 }
 .top-panel {
     height: 493px;
@@ -141,11 +216,11 @@ CUSTOM_CSS = """
 }
 .panel-title {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: #00ff88;
+    font-size: 13px; /* Linear eyebrow */
+    font-weight: 500;
+    color: #8a8f98; /* Linear ink-subtle */
     text-transform: uppercase;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.04em; /* Linear positive tracking for eyebrow */
     margin-bottom: 0.75rem;
     display: flex;
     align-items: center;
@@ -158,38 +233,44 @@ CUSTOM_CSS = """
     height: 6px;
     background: #00ff88;
     border-radius: 50%;
-    box-shadow: 0 0 8px #00ff88;
+    box-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
 }
 
 /* Agent status table */
 .agent-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; font-family: 'Inter', sans-serif; }
 .agent-table td { padding: 4px 8px; vertical-align: middle; }
-.agent-table .team-name { color: #8b949e; font-weight: 600; white-space: nowrap; font-size: 0.75rem; text-transform: uppercase; }
+.agent-table .team-name {
+    color: #8a8f98; /* Linear ink-subtle */
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
 .agent-table .agent-name { color: #c9d1d9; padding-left: 12px; }
 
-.status-dot {
+/* Status Badges */
+.status-badge {
     display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin-right: 8px;
+    padding: 2px 8px;
+    border-radius: 9999px; /* Vercel Pill */
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    border: 1px solid transparent;
 }
-.status-completed { color: #00ff88; font-weight: 500; }
-.status-completed::before { content: "●"; margin-right: 6px; color: #00ff88; filter: drop-shadow(0 0 4px #00ff88); }
+.status-completed { background: rgba(0, 255, 136, 0.1); color: #00ff88; border-color: rgba(0, 255, 136, 0.2); box-shadow: 0 0 8px rgba(0, 255, 136, 0.1); }
+.status-in_progress { background: rgba(255, 170, 0, 0.1); color: #ffaa00; border-color: rgba(255, 170, 0, 0.2); animation: pulse-badge 2s infinite; }
+.status-pending { background: rgba(138, 143, 152, 0.1); color: #8a8f98; border-color: rgba(138, 143, 152, 0.2); }
+.status-error { background: rgba(255, 68, 68, 0.1); color: #ff4444; border-color: rgba(255, 68, 68, 0.2); }
 
-.status-in_progress { color: #ffaa00; font-weight: 500; }
-.status-in_progress::before { content: "○"; margin-right: 6px; color: #ffaa00; animation: pulse 1.5s infinite; }
-
-.status-pending { color: #484f58; }
-.status-pending::before { content: "◌"; margin-right: 6px; color: #484f58; }
-
-.status-error { color: #ff4444; font-weight: 500; }
-.status-error::before { content: "×"; margin-right: 6px; color: #ff4444; }
-
-@keyframes pulse {
-    0% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(0.9); }
-    100% { opacity: 1; transform: scale(1); }
+@keyframes pulse-badge {
+    0% { box-shadow: 0 0 0 0 rgba(255, 170, 0, 0.3); }
+    70% { box-shadow: 0 0 0 4px rgba(255, 170, 0, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 170, 0, 0); }
 }
 
 /* Scanning Line Effect */
@@ -230,33 +311,49 @@ CUSTOM_CSS = """
     background: rgba(0, 255, 136, 0.55);
 }
 .msg-table { width: 100%; border-collapse: collapse; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
-.msg-table td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: top; }
-.msg-table tr:hover { background: rgba(0, 255, 136, 0.03); }
-.msg-table .msg-time { color: #58a6ff; white-space: nowrap; width: 75px; opacity: 0.8; }
-.msg-table .msg-type { width: 65px; text-align: center; font-weight: 600; font-size: 0.7rem; text-transform: uppercase; }
-.msg-table .msg-type-Agent { color: #00ff88; }
-.msg-table .msg-type-System { color: #d29922; }
-.msg-table .msg-type-Data { color: #a371f7; }
-.msg-table .msg-type-Tool { color: #ff7b72; }
-.msg-table .msg-type-User { color: #58a6ff; }
-.msg-table .msg-content { color: #c9d1d9; word-break: break-word; line-height: 1.4; }
+.msg-table td { padding: 6px 8px; border-bottom: 1px solid #141516; vertical-align: top; }
+.msg-table tr:hover { background: #141516; }
+.msg-table .msg-time { color: #8a8f98; white-space: nowrap; width: 75px; opacity: 0.8; }
+.msg-table .msg-type { width: 70px; text-align: center; }
 
-/* Stats bar - Bento Style Refinement */
+/* Message Type Micro Badges */
+.msg-type-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1px solid transparent;
+}
+.msg-type-Agent { background: rgba(0, 255, 136, 0.1); color: #00ff88; border-color: rgba(0, 255, 136, 0.2); }
+.msg-type-System { background: rgba(210, 153, 34, 0.1); color: #d29922; border-color: rgba(210, 153, 34, 0.2); }
+.msg-type-Data { background: rgba(163, 113, 247, 0.1); color: #a371f7; border-color: rgba(163, 113, 247, 0.2); }
+.msg-type-Tool { background: rgba(255, 123, 114, 0.1); color: #ff7b72; border-color: rgba(255, 123, 114, 0.2); }
+.msg-type-User { background: rgba(88, 166, 255, 0.1); color: #58a6ff; border-color: rgba(88, 166, 255, 0.2); }
+.msg-table .msg-content { color: #c9d1d9; word-break: break-word; line-height: 1.5; }
+
+/* Stats bar - Vercel / Linear Style Refinement */
 .stats-bar {
     display: flex; gap: 1rem; justify-content: center;
-    font-size: 0.7rem; color: #8b949e; padding: 15px 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 0.75rem; color: #8a8f98; padding: 15px 0;
+    border-top: 1px solid #23252a; /* Linear hairline */
     margin-top: 2rem;
     font-family: 'JetBrains Mono', monospace;
     flex-wrap: wrap;
 }
 .stats-bar span {
     white-space: nowrap;
-    background: rgba(13, 17, 23, 0.6);
-    padding: 4px 10px;
+    background: rgba(13, 17, 23, 0.6); /* Translucent Glass */
+    padding: 4px 12px;
     border-radius: 6px;
-    border: 1px solid rgba(255,255,255,0.03);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+}
+.stats-bar span b {
+    color: #00ff88; /* Restore neon green metrics */
+    font-weight: 600;
 }
 .stats-bar b { color: #00ff88; font-weight: 500; }
 
@@ -362,6 +459,80 @@ button[data-baseweb="tab"][aria-selected="true"] p {
 }
 .stMultiSelect [data-baseweb="tag"] svg {
     fill: #00ff88 !important;
+}
+
+/* Custom Streamlit Running Status Widget (Top Right) */
+@keyframes widget-fade-in {
+    from { opacity: 0; transform: translateY(-10px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+[data-testid="stStatusWidget"] {
+    background-color: #0f1011 !important; /* Linear surface-1 */
+    border: 1px solid #23252a !important; /* Linear hairline */
+    border-radius: 50% !important; /* Perfect circle */
+    width: 32px !important;
+    height: 32px !important;
+    padding: 0 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.05) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    animation: widget-fade-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+    position: relative !important;
+    font-size: 0 !important; /* Hide any stray text like 'Running...' */
+    color: transparent !important;
+}
+
+/* Hide the default running stickman SVG and any nested spans */
+[data-testid="stStatusWidget"] svg,
+[data-testid="stStatusWidget"] img,
+[data-testid="stStatusWidget"] span {
+    display: none !important;
+}
+
+/* Add a custom Vercel-style pulsing dot perfectly centered */
+[data-testid="stStatusWidget"]::before {
+    content: "";
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    display: block !important;
+    width: 8px !important;
+    height: 8px !important;
+    background-color: #00ff88 !important;
+    border-radius: 50% !important;
+    box-shadow: 0 0 8px rgba(0, 255, 136, 0.6) !important;
+    animation: status-widget-pulse 1.5s infinite !important;
+    z-index: 5 !important;
+    flex-shrink: 0 !important;
+}
+
+@keyframes status-widget-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.4); }
+    70% { box-shadow: 0 0 0 4px rgba(0, 255, 136, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
+}
+
+/* Make the 'Stop' button an invisible overlay to prevent layout shifts */
+[data-testid="stStatusWidget"] button {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    opacity: 0 !important; /* Completely invisible */
+    cursor: pointer !important;
+    z-index: 10 !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 0 !important;
+}
+
+[data-testid="stStatusWidget"] button::after {
+    display: none !important;
 }
 </style>
 """

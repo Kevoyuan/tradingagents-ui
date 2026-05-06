@@ -33,7 +33,7 @@ def render_progress_panel(agent_status: dict, selected_analysts: list[str]):
             html += '<tr class="team-sep"><td colspan="3"></td></tr>'
             continue
         html += f'<tr><td class="team-name">{team}</td><td class="agent-name">{agent}</td>'
-        html += f'<td class="status-{status}">{status.replace("_", " ")}</td></tr>'
+        html += f'<td><span class="status-badge status-{status}">{status.replace("_", " ")}</span></td></tr>'
     html += "</table>"
     return html
 
@@ -54,7 +54,7 @@ def render_messages_panel(messages: list, tool_calls: list):
         safe_ts = html_lib.escape(str(ts), quote=True)
         safe_mtype = html_lib.escape(str(mtype), quote=True)
         html += f'<tr><td class="msg-time">{safe_ts}</td>'
-        html += f'<td class="msg-type msg-type-{safe_mtype}">{safe_mtype}</td>'
+        html += f'<td class="msg-type"><span class="msg-type-badge msg-type-{safe_mtype}">{safe_mtype}</span></td>'
         html += f'<td class="msg-content">{safe_content}</td></tr>'
     html += "</table>"
     return html

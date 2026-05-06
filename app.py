@@ -6,6 +6,7 @@ import datetime
 import threading
 import html as html_lib
 import traceback
+import base64
 from pathlib import Path
 
 import streamlit as st
@@ -373,6 +374,21 @@ def normalize_saved_analysts(values) -> list[str]:
     return selected or ["market", "social", "news", "fundamentals"]
 
 
+def render_inline_html(html: str, height: int):
+    """Render inline HTML using the modern iframe API when available."""
+    if hasattr(st, "iframe"):
+        encoded = base64.b64encode(html.encode("utf-8")).decode("ascii")
+        src = f"data:text/html;base64,{encoded}"
+        try:
+            st.iframe(src, height=height, scrolling=False)
+        except TypeError:
+            st.iframe(src, height=height)
+        return
+
+    import streamlit.components.v1 as components
+
+    components.html(html, height=height)
+
 
 def render_report_with_nav(report_content: str, id_prefix: str = "report"):
     """Render report with a navigation sidebar in the left column."""
@@ -422,9 +438,8 @@ def render_report_with_nav(report_content: str, id_prefix: str = "report"):
             nav_html += '</div>'
             st.markdown(nav_html, unsafe_allow_html=True)
         
-        # Copy Button via HTML Component
+        # Copy Button via inline iframe
         import json
-        import streamlit.components.v1 as components
         
         # ensure_ascii=False keeps Chinese characters readable, escaping for JS script block
         safe_content = json.dumps(report_content, ensure_ascii=False)
@@ -433,7 +448,7 @@ def render_report_with_nav(report_content: str, id_prefix: str = "report"):
         
         copy_html = f"""
         <style>
-        body {{ margin: 0; padding: 0; background: transparent; }}
+        body {{ margin: 0; padding: 0; background: transparent; overflow: hidden; }}
         .report-copy-btn {{
             width: 100%;
             background: transparent;
@@ -496,6 +511,7 @@ def render_report_with_nav(report_content: str, id_prefix: str = "report"):
             }};
         </script>
         """
+        import streamlit.components.v1 as components
         components.html(copy_html, height=45)
 
     with col_content:
