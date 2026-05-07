@@ -125,15 +125,54 @@ def get_runtime_llm_config(provider: str, api_env_values: dict[str, str]) -> tup
 def render_model_selector(label: str, provider: str, mode: str, saved_model: str) -> str:
     choices = get_model_choices(provider, mode)
     if not choices:
-        return st.text_input(f"{label} ID", value=saved_model or "")
+        return st.text_input(f"{label} ID", value=saved_model or "", key=f"model_text_{provider}_{mode}")
 
     saved_display = get_model_display(provider, mode, saved_model, choices)
     index = choices.index(saved_display) if saved_display in choices else 0
-    display = st.selectbox(label, choices, index=index)
+    display = st.selectbox(label, choices, index=index, key=f"model_select_{provider}_{mode}")
     selected_id = get_model_id(provider, mode, display)
     if selected_id == "custom":
-        return st.text_input(f"{label} Custom ID", value=saved_model if saved_model != "custom" else "")
+        return st.text_input(
+            f"{label} Custom ID",
+            value=saved_model if saved_model != "custom" else "",
+            key=f"model_custom_{provider}_{mode}",
+        )
     return selected_id
+
+
+def get_saved_provider_model(provider: str, mode: str, fallback: str) -> str:
+    profiles = st.session_state.setdefault("provider_model_profiles", {})
+    provider_profile = profiles.get(provider, {})
+    return provider_profile.get(mode, fallback)
+
+
+def remember_provider_models(provider: str, quick_model: str, deep_model: str):
+    profiles = st.session_state.setdefault("provider_model_profiles", {})
+    profiles[provider] = {"quick": quick_model, "deep": deep_model}
+
+
+def build_api_key_profile_id(provider: str, quick_model: str, deep_model: str) -> str:
+    return f"{provider}|quick:{quick_model or ''}|deep:{deep_model or ''}"
+
+
+def sync_provider_api_key_input(provider: str, profile_id: str):
+    """Switch the visible API key field when provider/model profile changes."""
+    profiles = st.session_state.setdefault("api_key_profiles", {})
+    provider_profiles = profiles.setdefault(provider, {})
+    current_cursor = f"{provider}::{profile_id}"
+    previous_cursor = st.session_state.get("_api_key_profile_cursor")
+
+    if previous_cursor and previous_cursor != current_cursor:
+        prev_provider, prev_profile = previous_cursor.split("::", 1)
+        prev_profiles = profiles.setdefault(prev_provider, {})
+        prev_value = st.session_state.get(f"api_key_{prev_provider}", "").strip()
+        prev_profiles[prev_profile] = prev_value
+        st.session_state[f"api_key_{prev_provider}"] = prev_value
+
+    if previous_cursor != current_cursor:
+        fallback = st.session_state.get(f"api_key_{provider}", "")
+        st.session_state[f"api_key_{provider}"] = provider_profiles.get(profile_id, fallback)
+        st.session_state["_api_key_profile_cursor"] = current_cursor
 
 
 def init_session_state():
@@ -150,6 +189,8 @@ def init_session_state():
         st.session_state.provider = prefs.get("llm_provider", "deepseek")
         st.session_state.quick_model = prefs.get("quick_think_llm", "")
         st.session_state.deep_model = prefs.get("deep_think_llm", "")
+        st.session_state.provider_model_profiles = prefs.get("provider_model_profiles", {})
+        st.session_state.api_key_profiles = prefs.get("api_key_profiles", {})
 
         for provider, env_name in PROVIDER_API_KEY_ENV.items():
             st.session_state[f"api_key_{provider}"] = os.environ.get(env_name, saved_env.get(env_name, ""))
@@ -189,6 +230,8 @@ def save_current_config():
         "llm_provider": st.session_state.get("provider", "deepseek"),
         "quick_think_llm": st.session_state.get("quick_model", ""),
         "deep_think_llm": st.session_state.get("deep_model", ""),
+        "provider_model_profiles": st.session_state.get("provider_model_profiles", {}),
+        "api_key_profiles": st.session_state.get("api_key_profiles", {}),
     })
     save_api_env_file(get_all_api_env_values())
 
@@ -813,30 +856,37 @@ def browse_reports_ui():
         st.info("No previous reports found.")
         return
 
-    # Let user pick a report
-    options = []
+    # Let user pick a report — sort by creation time, newest first
+    entries = []
     for rp in report_dirs:
         parent = rp.parent.name
         name = rp.name
         rf = rp / "complete_report.md"
         if not rf.exists():
             rf = rp / "reports" / "complete_report.md"
-        mod_time = datetime.datetime.fromtimestamp(rf.stat().st_mtime)
-        options.append((f"{parent}/{name}  —  {mod_time.strftime('%Y-%m-%d %H:%M')}", rp))
+        stat = rf.stat()
+        created_ts = getattr(stat, "st_birthtime", None) or stat.st_ctime or stat.st_mtime
+        created_time = datetime.datetime.fromtimestamp(created_ts)
+        entries.append(
+            {
+                "label": f"{parent}/{name}  —  {created_time.strftime('%Y-%m-%d %H:%M')}",
+                "report_path": rf,
+                "sort_time": created_time,
+            }
+        )
+    entries.sort(key=lambda x: x["sort_time"], reverse=True)
+    labels = [item["label"] for item in entries]
+    label_to_path = {item["label"]: item["report_path"] for item in entries}
 
     selected = st.selectbox(
         "Select a report",
-        options,
+        labels,
         index=0,
         label_visibility="collapsed",
-        format_func=lambda option: option[0],
     )
 
     if selected:
-        _, rp = selected
-        rf = rp / "complete_report.md"
-        if not rf.exists():
-            rf = rp / "reports" / "complete_report.md"
+        rf = label_to_path[selected]
         if rf.exists():
             content = rf.read_text(encoding="utf-8")
             st.markdown("---")
@@ -896,16 +946,40 @@ def render_sidebar():
         else:
             st.caption("Native TradingAgents provider.")
 
+        quick_model = render_model_selector(
+            "Quick-Thinking Model",
+            provider_key,
+            "quick",
+            get_saved_provider_model(provider_key, "quick", st.session_state.quick_model),
+        )
+        st.session_state.quick_model = quick_model
+
+        deep_model = render_model_selector(
+            "Deep-Thinking Model",
+            provider_key,
+            "deep",
+            get_saved_provider_model(provider_key, "deep", st.session_state.deep_model),
+        )
+        st.session_state.deep_model = deep_model
+        remember_provider_models(provider_key, quick_model, deep_model)
+
         st.markdown("#### API Keys")
         api_key_env = PROVIDER_API_KEY_ENV.get(provider_key)
         if api_key_env:
+            profile_id = build_api_key_profile_id(provider_key, quick_model, deep_model)
+            sync_provider_api_key_input(provider_key, profile_id)
             st.text_input(
                 f"{get_provider_label(provider_key)} API Key",
                 type="password",
                 key=f"api_key_{provider_key}",
                 placeholder=api_key_env,
-                help=f"Saved to {USER_ENV_FILE} when you save preferences or run analysis.",
+                help=(
+                    f"Saved to {USER_ENV_FILE} when you save preferences or run analysis. "
+                    "Also remembered per provider/model profile."
+                ),
             )
+            active_value = st.session_state.get(f"api_key_{provider_key}", "").strip()
+            st.session_state.setdefault("api_key_profiles", {}).setdefault(provider_key, {})[profile_id] = active_value
             if os.environ.get(api_key_env):
                 st.caption(f"{api_key_env} is already available in the current environment.")
         else:
@@ -944,22 +1018,6 @@ def render_sidebar():
             )
             if os.environ.get("ALPHA_VANTAGE_API_KEY"):
                 st.caption("ALPHA_VANTAGE_API_KEY is already available in the current environment.")
-
-        quick_model = render_model_selector(
-            "Quick-Thinking Model",
-            provider_key,
-            "quick",
-            st.session_state.quick_model,
-        )
-        st.session_state.quick_model = quick_model
-
-        deep_model = render_model_selector(
-            "Deep-Thinking Model",
-            provider_key,
-            "deep",
-            st.session_state.deep_model,
-        )
-        st.session_state.deep_model = deep_model
 
         st.divider()
         if st.button("Save Preferences", use_container_width=True):
