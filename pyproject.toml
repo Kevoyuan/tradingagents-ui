@@ -15,3 +15,6 @@ dependencies = [
 
 [project.scripts]
 trade-ui = "trade_ui.cli:main"
+
+[tool.setuptools]
+packages = ["trade_ui"]

@@ -17,6 +17,35 @@ def _find_project_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def _resolve_app_path() -> Path:
+    """Resolve which app.py to run.
+
+    Priority:
+    1) TRADINGAGENTS_UI_APP_PATH
+    2) ./app.py from current working directory
+    3) installed package project root app.py
+    """
+    env_path = os.environ.get("TRADINGAGENTS_UI_APP_PATH")
+    if env_path:
+        candidate = Path(env_path).expanduser().resolve()
+        if candidate.is_file():
+            return candidate
+        print(f"Error: TRADINGAGENTS_UI_APP_PATH does not point to a file: {candidate}")
+        sys.exit(1)
+
+    cwd_app = (Path.cwd() / "app.py").resolve()
+    if cwd_app.is_file():
+        return cwd_app
+
+    fallback = _find_project_root() / "app.py"
+    if fallback.is_file():
+        return fallback.resolve()
+
+    print("Error: app.py not found.")
+    print("Checked TRADINGAGENTS_UI_APP_PATH, current working directory, and installed package location.")
+    sys.exit(1)
+
+
 def _find_tradingagents_dir() -> Path | None:
     """Find an editable/local TradingAgents checkout when one is available."""
     env_dir = os.environ.get("TRADINGAGENTS_DIR")
@@ -181,12 +210,7 @@ def main():
         print("All other options are passed to Streamlit.")
         sys.exit(0)
 
-    root = _find_project_root()
-    app_path = root / "app.py"
-
-    if not app_path.exists():
-        print(f"Error: app.py not found at {app_path}")
-        sys.exit(1)
+    app_path = _resolve_app_path()
 
     if not _check_tradingagents_updates():
         sys.exit(1)
@@ -208,6 +232,7 @@ def main():
            "--server.port", port, "--server.headless", "true"]
     cmd.extend(extra_args)
 
+    print(f"Launching UI from: {app_path}")
     print()
     os.execvp(cmd[0], cmd)
 
