@@ -27,6 +27,14 @@ trade-ui
 `trade-ui` checks TradingAgents updates, configures the runtime, and opens the
 web app at `http://localhost:8501`.
 
+UI entrypoint selection priority:
+
+- `TRADINGAGENTS_UI_APP_PATH` (explicit override)
+- `./app.py` in your current working directory
+- packaged fallback path inside the installed `trade-ui`
+
+The CLI prints the absolute `app.py` path before launch, so you can verify which code is running.
+
 ### Setup (first time)
 
 ```bash
@@ -38,6 +46,25 @@ python3 -m pip install -e .
 Make sure the Python scripts directory is in your `PATH` so the `trade-ui`
 command is available. For local development, `./run.sh` launches through the
 same `trade-ui` wrapper.
+
+### Sync development changes to the installed app checkout
+
+If `trade-ui` is running from the app-managed checkout under
+`~/.local/share/tradingagents-ui/projects/tradingagents-ui`, sync your local
+development checkout into that app checkout:
+
+```bash
+./scripts/sync-to-app.sh
+```
+
+To keep it synced while you edit:
+
+```bash
+./scripts/watch-sync-to-app.sh
+```
+
+The sync excludes local git metadata, virtualenvs, Python caches, and upload
+scratch files.
 
 API keys are entered in the Streamlit sidebar and saved to the UI-owned
 `~/.tradingagents/.env`. The UI no longer reads `../tradingagents/.env` or
