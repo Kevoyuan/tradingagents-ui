@@ -73,21 +73,20 @@ requires a sibling TradingAgents checkout.
 ## Auto-Update Check
 
 Both `trade-ui` and `./run.sh` check TradingAgents before launching the UI.
-If a local TradingAgents git checkout is available, the command compares tags,
-offers to pull the latest version, and reinstalls that checkout into the current
-Python environment. If the checkout exists but is not installed in the active
-Python environment yet, `trade-ui` installs it automatically.
+By default, `trade-ui` treats TradingAgents as a normal Python dependency: if it
+is missing, it offers to install it from GitHub; if it is installed, it can offer
+to update the installed package directly from GitHub.
 
-Checkout discovery order:
+For development only, you can point `trade-ui` at a local TradingAgents checkout:
 
-- `TRADINGAGENTS_DIR` environment variable
-- sibling `../tradingagents`
-- the installed `tradingagents` package path, if it is an editable git checkout
+```bash
+export TRADINGAGENTS_DIR=/path/to/tradingagents
+```
 
-If no git checkout is found, `trade-ui` can still offer to update the installed
-package directly from GitHub. If TradingAgents is not installed at all, it will
-prompt to install it before launching the web app. If you decline, `trade-ui`
-exits instead of opening a broken UI.
+When `TRADINGAGENTS_DIR` is set, `trade-ui` compares tags, offers to pull the
+latest version, and reinstalls that checkout into the current Python environment.
+If the checkout has local changes, `trade-ui` skips the automatic pull so it
+does not overwrite your work.
 
 ```bash
 python3 -m pip install -U git+https://github.com/TauricResearch/TradingAgents.git

@@ -47,24 +47,12 @@ def _resolve_app_path() -> Path:
 
 
 def _find_tradingagents_dir() -> Path | None:
-    """Find an editable/local TradingAgents checkout when one is available."""
+    """Find an explicitly configured TradingAgents checkout."""
     env_dir = os.environ.get("TRADINGAGENTS_DIR")
     if env_dir:
         candidate = Path(env_dir).expanduser().resolve()
         if (candidate / ".git").exists():
             return candidate
-
-    root = _find_project_root()
-    sibling = root.parent / "tradingagents"
-    if (sibling / ".git").exists():
-        return sibling
-
-    spec = importlib.util.find_spec("tradingagents")
-    if spec and spec.origin:
-        package_dir = Path(spec.origin).resolve().parent
-        for candidate in (package_dir.parent, package_dir.parent.parent):
-            if (candidate / ".git").exists():
-                return candidate
 
     return None
 
@@ -105,6 +93,19 @@ def _latest_remote_tag(repo_dir: Path) -> str:
         return "unknown"
 
 
+def _has_local_changes(repo_dir: Path) -> bool:
+    try:
+        status = subprocess.check_output(
+            ["git", "status", "--porcelain"],
+            cwd=repo_dir,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+    except subprocess.CalledProcessError:
+        return True
+    return bool(status.strip())
+
+
 def _ask_yes_no(prompt: str, default: bool = True) -> bool:
     suffix = "[Y/n]" if default else "[y/N]"
     try:
@@ -127,6 +128,11 @@ def _install_local_checkout(repo_dir: Path) -> bool:
 
 
 def _update_local_checkout(repo_dir: Path) -> bool:
+    if _has_local_changes(repo_dir):
+        print(f"TradingAgents checkout has local changes: {repo_dir}")
+        print("Skipping automatic pull. Commit, stash, or update it manually when ready.")
+        return _install_local_checkout(repo_dir) if not _is_tradingagents_installed() else True
+
     print("Pulling latest TradingAgents...")
     try:
         subprocess.run(["git", "pull", "--ff-only"], cwd=repo_dir, check=True)
@@ -161,7 +167,7 @@ def _check_tradingagents_updates() -> bool:
 
     if not repo_dir:
         if _is_tradingagents_installed():
-            print("No local TradingAgents git checkout found.")
+            print("TradingAgents is installed in the current Python environment.")
             if _ask_yes_no("Update the installed TradingAgents package from GitHub?", default=False):
                 return _update_git_dependency()
             print("Skipping TradingAgents update.")
