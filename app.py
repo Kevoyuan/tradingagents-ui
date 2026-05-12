@@ -47,6 +47,13 @@ SECRET_ENV_NAMES = tuple(
     )
 )
 
+
+def safe_report_filename_part(value: str) -> str:
+    """Make provider/model IDs safe and readable in saved report filenames."""
+    cleaned = "".join(ch if ch.isalnum() or ch in ("-", "_", ".") else "-" for ch in str(value or "unknown"))
+    cleaned = "-".join(part for part in cleaned.split("-") if part)
+    return cleaned[:80] or "unknown"
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def get_model_choices(provider: str, mode: str) -> list[str]:
@@ -742,7 +749,14 @@ def _run_analysis_thread(
                 text = "\n".join(str(i) for i in content) if isinstance(content, list) else str(content)
                 complete.append(f"## {sn.replace('_', ' ').title()}\n\n{text}")
         complete_report = "\n\n---\n\n".join(complete)
-        (report_dir / "complete_report.md").write_text(complete_report, encoding="utf-8")
+        complete_report_path = report_dir / "complete_report.md"
+        complete_report_path.write_text(complete_report, encoding="utf-8")
+        model_report_name = (
+            "complete_report__"
+            f"deep-{safe_report_filename_part(deep_model)}.md"
+        )
+        model_report_path = report_dir / model_report_name
+        model_report_path.write_text(complete_report, encoding="utf-8")
 
         # Create a symlink to the latest report in the user data directory.
         latest_symlink = Path.home() / ".tradingagents" / "latest_report.md"
@@ -750,7 +764,7 @@ def _run_analysis_thread(
             latest_symlink.parent.mkdir(parents=True, exist_ok=True)
             if latest_symlink.exists() or latest_symlink.is_symlink():
                 latest_symlink.unlink()
-            latest_symlink.symlink_to(report_dir / "complete_report.md")
+            latest_symlink.symlink_to(complete_report_path)
         except Exception:
             pass  # Fallback if OS prevents symlinking
 
