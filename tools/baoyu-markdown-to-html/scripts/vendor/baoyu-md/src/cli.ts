@@ -8,6 +8,8 @@ import {
 import { THEME_NAMES } from "./themes.js";
 import { loadExtendConfig } from "./extend-config.js";
 
+const EXTRA_THEME_NAMES = ["quant-terminal"];
+
 export function printUsage(): void {
   console.error(
     [
@@ -15,7 +17,7 @@ export function printUsage(): void {
       "  npx tsx render.ts <markdown_file> [options]",
       "",
       "Options:",
-      `  --theme <name>        Theme (${THEME_NAMES.join(", ")})`,
+      `  --theme <name>        Theme (${[...THEME_NAMES, ...EXTRA_THEME_NAMES].join(", ")})`,
       `  --color <name|hex>    Primary color: ${Object.keys(COLOR_PRESETS).join(", ")}, or hex`,
       `  --font-family <name>  Font: ${Object.keys(FONT_FAMILY_MAP).join(", ")}, or CSS value`,
       `  --font-size <N>       Font size: ${FONT_SIZE_OPTIONS.join(", ")} (default: 16px)`,
@@ -151,7 +153,7 @@ export function parseArgs(argv: string[]): CliOptions | null {
     return null;
   }
 
-  if (!THEME_NAMES.includes(theme)) {
+  if (![...THEME_NAMES, ...EXTRA_THEME_NAMES].includes(theme)) {
     console.error(`Unknown theme: ${theme}`);
     return null;
   }
