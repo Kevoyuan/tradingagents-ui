@@ -5,6 +5,7 @@ import datetime
 import html as html_lib
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -478,11 +479,42 @@ def ensure_baoyu_dependencies():
             raise RuntimeError(f"Failed to install HTML converter dependencies: {detail}")
 
 
-def generate_html_report(markdown_report: str) -> tuple[str, str]:
+def clean_export_meta_value(value: object) -> str:
+    return str(value or "").strip()
+
+
+def current_report_export_meta() -> dict[str, str]:
+    """Read the currently selected report metadata from the UI configuration."""
+    model = clean_export_meta_value(st.session_state.get("deep_model")) or clean_export_meta_value(
+        st.session_state.get("quick_model")
+    )
+    return {
+        "ticker": clean_export_meta_value(st.session_state.get("ticker")),
+        "date": clean_export_meta_value(st.session_state.get("analysis_date")),
+        "model": model,
+    }
+
+
+def report_export_meta_from_path(report_path: Path) -> dict[str, str]:
+    """Infer metadata for downloaded historical reports from the saved report path."""
+    meta: dict[str, str] = {}
+    parts = report_path.parts
+    if len(parts) >= 4 and report_path.parent.name == "reports":
+        meta["date"] = report_path.parent.parent.name
+        meta["ticker"] = report_path.parent.parent.parent.name
+
+    match = re.search(r"complete_report__deep-(.+)\.md$", report_path.name)
+    if match:
+        meta["model"] = match.group(1)
+    return meta
+
+
+def generate_html_report(markdown_report: str, metadata: dict[str, str] | None = None) -> tuple[str, str]:
     """Generate a self-contained HTML report with the vendored baoyu markdown-to-html skill."""
     if not BAOYU_MARKDOWN_TO_HTML_SCRIPT.exists():
         raise RuntimeError(f"Bundled markdown converter not found: {BAOYU_MARKDOWN_TO_HTML_SCRIPT}")
     ensure_baoyu_dependencies()
+    metadata = metadata or {}
 
     with tempfile.TemporaryDirectory(prefix="tradingagents-report-") as tmp:
         markdown_path = Path(tmp) / "tradingagents_report.md"
@@ -495,6 +527,12 @@ def generate_html_report(markdown_report: str) -> tuple[str, str]:
             "quant-terminal",
             "--keep-title",
         ]
+        if metadata.get("ticker"):
+            cmd.extend(["--qt-ticker", metadata["ticker"]])
+        if metadata.get("date"):
+            cmd.extend(["--qt-date", metadata["date"]])
+        if metadata.get("model"):
+            cmd.extend(["--qt-model", metadata["model"]])
         result = subprocess.run(
             cmd,
             cwd=PROJECT_ROOT,
@@ -534,9 +572,12 @@ def render_inline_html(html: str, height: int):
     components.html(html, height=height)
 
 
-def render_report_with_nav(report_content: str, id_prefix: str = "report"):
+def render_report_with_nav(
+    report_content: str,
+    id_prefix: str = "report",
+    export_metadata: dict[str, str] | None = None,
+):
     """Render report with a navigation sidebar in the left column."""
-    import re
     if not report_content:
         st.markdown(
             '<div style="color:#666;font-style:italic;padding:1rem 0;">Waiting for analysis report...</div>',
@@ -680,7 +721,10 @@ def render_report_with_nav(report_content: str, id_prefix: str = "report"):
             st.session_state.pop(filename_key, None)
             st.session_state.pop(error_key, None)
             try:
-                html_report, html_filename = generate_html_report(report_content)
+                html_report, html_filename = generate_html_report(
+                    report_content,
+                    export_metadata or current_report_export_meta(),
+                )
                 st.session_state[generated_key] = html_report
                 st.session_state[filename_key] = html_filename
             except Exception as exc:
@@ -1020,9 +1064,13 @@ def browse_reports_ui():
     for rp in report_dirs:
         parent = rp.parent.name
         name = rp.name
-        rf = rp / "complete_report.md"
-        if not rf.exists():
-            rf = rp / "reports" / "complete_report.md"
+        reports_dir = rp / "reports"
+        model_reports = sorted(
+            reports_dir.glob("complete_report__deep-*.md"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        ) if reports_dir.exists() else []
+        rf = model_reports[0] if model_reports else reports_dir / "complete_report.md"
         stat = rf.stat()
         created_ts = getattr(stat, "st_birthtime", None) or stat.st_ctime or stat.st_mtime
         created_time = datetime.datetime.fromtimestamp(created_ts)
@@ -1049,7 +1097,11 @@ def browse_reports_ui():
         if rf.exists():
             content = rf.read_text(encoding="utf-8")
             st.markdown("---")
-            render_report_with_nav(content, id_prefix="browse")
+            render_report_with_nav(
+                content,
+                id_prefix="browse",
+                export_metadata=report_export_meta_from_path(rf),
+            )
             st.markdown("---")
             st.caption(f"Path: `{rf}`")
 

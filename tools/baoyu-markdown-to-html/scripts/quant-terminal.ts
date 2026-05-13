@@ -142,18 +142,18 @@ function firstMatch(markdown: string, patterns: RegExp[]): string {
   return "";
 }
 
-function extractMeta(markdown: string, title: string): QuantMeta {
-  const ticker = firstMatch(markdown, [
+function extractMeta(markdown: string, title: string, overrides?: Partial<QuantMeta>): QuantMeta {
+  const ticker = overrides?.ticker || firstMatch(markdown, [
     /(?:ticker|symbol)\s*[:：]\s*`?([A-Z][A-Z0-9.\-]{0,9})`?/i,
     /\b(?:NYSE|NASDAQ|HKEX|SSE|SZSE)\s*[:：]\s*([A-Z0-9.\-]{1,10})\b/i,
   ]) || firstMatch(title, [/\b([A-Z][A-Z0-9.\-]{1,9})\b/]) || "Unknown";
 
-  const date = firstMatch(markdown, [
+  const date = overrides?.date || firstMatch(markdown, [
     /(?:analysis date|date)\s*[:：]\s*(\d{4}-\d{2}-\d{2})/i,
     /\b(\d{4}-\d{2}-\d{2})\b/,
   ]) || "Unknown";
 
-  const model = firstMatch(markdown, [
+  const model = overrides?.model || firstMatch(markdown, [
     /(?:model|llm|quick|deep)\s*[:：]\s*`?([A-Za-z0-9_.:/\- ]{2,80})`?/i,
   ]) || "Unknown";
 
@@ -332,12 +332,14 @@ body {
   align-self: start;
   max-height: calc(100vh - 96px);
   overflow: auto;
+  scrollbar-width: none;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: color-mix(in srgb, var(--card) 94%, transparent);
   box-shadow: var(--panel-shadow), inset 0 1px 0 rgba(255,255,255,0.04);
 }
+.qt-sidebar::-webkit-scrollbar { width: 0; height: 0; }
 .qt-sidebar-title {
   margin: 2px 4px 12px;
   color: var(--muted);
@@ -720,6 +722,7 @@ export async function renderQuantTerminalDocument(
   markdown: string,
   title: string,
   options?: Partial<Omit<CliOptions, "inputPath">>,
+  overrides?: Partial<QuantMeta>,
 ): Promise<string> {
   const rendered = await renderMarkdownDocument(markdown, {
     codeTheme: options?.codeTheme,
@@ -736,7 +739,7 @@ export async function renderQuantTerminalDocument(
     theme: "simple",
   });
   const enhanced = enhanceSections(rendered.contentHtml);
-  const meta = extractMeta(markdown, title);
+  const meta = extractMeta(markdown, title, overrides);
   const reasons = extractReasons(markdown);
   const confidenceHtml = meta.confidence === undefined
     ? '<div class="qt-confidence-label"><span>Confidence</span><span class="qt-mono">Unknown</span></div>'

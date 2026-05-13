@@ -39,6 +39,9 @@ interface ParsedResult {
 
 type ConvertMarkdownOptions = Partial<Omit<CliOptions, "inputPath">> & {
   title?: string;
+  quantTicker?: string;
+  quantDate?: string;
+  quantModel?: string;
 };
 
 export async function convertMarkdown(
@@ -82,7 +85,11 @@ export async function convertMarkdown(
   );
 
   const html = theme === "quant-terminal"
-    ? await renderQuantTerminalDocument(rewrittenMarkdown, title, options)
+    ? await renderQuantTerminalDocument(rewrittenMarkdown, title, options, {
+      ticker: options?.quantTicker,
+      date: options?.quantDate,
+      model: options?.quantModel,
+    })
     : (await renderMarkdownDocument(rewrittenMarkdown, {
       codeTheme: options?.codeTheme,
       countStatus: options?.countStatus,
@@ -147,6 +154,9 @@ Usage:
 
 Options:
   --title <title>         Override title
+  --qt-ticker <ticker>    Quant Terminal ticker override
+  --qt-date <date>        Quant Terminal analysis date override
+  --qt-model <model>      Quant Terminal model override
   --theme <name>          Theme name (${THEME_NAMES.join(", ")}, quant-terminal). Default: default
   --color <name|hex>      Primary color: ${colorNames}
   --font-family <name>    Font: ${fontFamilyNames}, or CSS value
@@ -194,19 +204,35 @@ function parseArgValue(argv: string[], i: number, flag: string): string | null {
   return next ?? null;
 }
 
-function extractTitleArg(argv: string[]): { renderArgs: string[]; title?: string } {
+function extractWrapperArgs(argv: string[]): {
+  renderArgs: string[];
+  title?: string;
+  quantTicker?: string;
+  quantDate?: string;
+  quantModel?: string;
+} {
   let title: string | undefined;
+  let quantTicker: string | undefined;
+  let quantDate: string | undefined;
+  let quantModel: string | undefined;
   const renderArgs: string[] = [];
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]!;
-    if (arg === "--title" || arg.startsWith("--title=")) {
-      const value = parseArgValue(argv, i, "--title");
+    const valueFlags: Record<string, (value: string) => void> = {
+      "--title": (value) => { title = value; },
+      "--qt-ticker": (value) => { quantTicker = value; },
+      "--qt-date": (value) => { quantDate = value; },
+      "--qt-model": (value) => { quantModel = value; },
+    };
+    const matchedFlag = Object.keys(valueFlags).find((flag) => arg === flag || arg.startsWith(`${flag}=`));
+    if (matchedFlag) {
+      const value = parseArgValue(argv, i, matchedFlag);
       if (!value) {
-        console.error("Missing value for --title");
+        console.error(`Missing value for ${matchedFlag}`);
         printUsage(1);
       }
-      title = value;
+      valueFlags[matchedFlag]!(value);
       if (!arg.includes("=")) {
         i += 1;
       }
@@ -215,7 +241,7 @@ function extractTitleArg(argv: string[]): { renderArgs: string[]; title?: string
     renderArgs.push(arg);
   }
 
-  return { renderArgs, title };
+  return { renderArgs, title, quantTicker, quantDate, quantModel };
 }
 
 async function main(): Promise<void> {
@@ -224,7 +250,7 @@ async function main(): Promise<void> {
     printUsage(0);
   }
 
-  const { renderArgs, title } = extractTitleArg(args);
+  const { renderArgs, title, quantTicker, quantDate, quantModel } = extractWrapperArgs(args);
   const options = parseArgs(renderArgs);
   if (!options) {
     printUsage(1);
@@ -241,7 +267,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const result = await convertMarkdown(markdownPath, { ...options, title });
+  const result = await convertMarkdown(markdownPath, { ...options, title, quantTicker, quantDate, quantModel });
   console.log(JSON.stringify(result, null, 2));
 }
 
