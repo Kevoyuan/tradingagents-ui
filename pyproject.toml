@@ -18,3 +18,22 @@ trade-ui = "trade_ui.cli:main"
 
 [tool.setuptools]
 packages = ["trade_ui"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = ["SIM108"]
+
+[tool.ruff.lint.per-file-ignores]
+"ui_styles.py" = ["E501", "W291"]
+"ui_config.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_return_any = true
+warn_unused_ignores = true
