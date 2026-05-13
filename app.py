@@ -10,10 +10,11 @@ import traceback
 from pathlib import Path
 
 import streamlit as st
+from dotenv import dotenv_values, set_key, unset_key
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.llm_clients.model_catalog import MODEL_OPTIONS
 
-from preferences import load_preferences, save_preferences
+from preferences import PREFS_DIR, load_preferences, save_preferences
 from ui_config import (
     ALL_TEAMS,
     ANALYST_KEY_MAP,
@@ -45,6 +46,11 @@ MANAGED_ENV_NAMES = tuple(
     )
 )
 RUN_ENV_LOCK = threading.Lock()
+USER_ENV_FILE = PREFS_DIR / ".env"
+
+
+def is_local_persistence_enabled() -> bool:
+    return os.environ.get("TRADINGAGENTS_UI_LOCAL") == "1"
 
 
 def safe_report_filename_part(value: str) -> str:
@@ -184,6 +190,7 @@ def sync_provider_api_key_input(provider: str, profile_id: str):
 def init_session_state():
     if "initialized" not in st.session_state:
         prefs = load_preferences()
+        saved_env = load_saved_api_env_values() if is_local_persistence_enabled() else {}
 
         st.session_state.ticker = prefs.get("ticker", "")
         st.session_state.analysis_date = datetime.date.today().isoformat()
@@ -194,15 +201,15 @@ def init_session_state():
         st.session_state.quick_model = prefs.get("quick_think_llm", "")
         st.session_state.deep_model = prefs.get("deep_think_llm", "")
         st.session_state.provider_model_profiles = prefs.get("provider_model_profiles", {})
-        st.session_state.api_key_profiles = {}
+        st.session_state.api_key_profiles = prefs.get("api_key_profiles", {}) if is_local_persistence_enabled() else {}
 
-        for provider in PROVIDER_API_KEY_ENV:
-            st.session_state[f"api_key_{provider}"] = ""
-        for provider in PROVIDER_BASE_URL_ENV:
-            st.session_state[f"base_url_{provider}"] = PROVIDER_URLS.get(provider, "") or ""
+        for provider, env_name in PROVIDER_API_KEY_ENV.items():
+            st.session_state[f"api_key_{provider}"] = saved_env.get(env_name, "")
+        for provider, env_name in PROVIDER_BASE_URL_ENV.items():
+            st.session_state[f"base_url_{provider}"] = saved_env.get(env_name, PROVIDER_URLS.get(provider, "") or "")
         for env_name, _, _ in AZURE_ENV_FIELDS:
-            st.session_state[env_name] = ""
-        st.session_state["ALPHA_VANTAGE_API_KEY"] = ""
+            st.session_state[env_name] = saved_env.get(env_name, "")
+        st.session_state["ALPHA_VANTAGE_API_KEY"] = saved_env.get("ALPHA_VANTAGE_API_KEY", "")
 
         # Analysis state
         st.session_state.running = False
@@ -229,7 +236,62 @@ def save_current_config():
         "quick_think_llm": st.session_state.get("quick_model", ""),
         "deep_think_llm": st.session_state.get("deep_model", ""),
         "provider_model_profiles": st.session_state.get("provider_model_profiles", {}),
+        **({"api_key_profiles": st.session_state.get("api_key_profiles", {})} if is_local_persistence_enabled() else {}),
     })
+    if is_local_persistence_enabled():
+        save_api_env_file(get_all_api_env_values())
+
+
+def load_saved_api_env_values() -> dict[str, str]:
+    """Load persisted local credentials from the UI-owned .env file."""
+    try:
+        raw_values = dotenv_values(USER_ENV_FILE)
+    except OSError:
+        return {}
+    return {
+        env_name: str(value).strip()
+        for env_name, value in raw_values.items()
+        if env_name in MANAGED_ENV_NAMES and value
+    }
+
+
+def get_all_api_env_values() -> dict[str, str]:
+    """Collect all secret fields, including currently hidden provider keys."""
+    env_values = {}
+    for provider, env_name in PROVIDER_API_KEY_ENV.items():
+        env_values[env_name] = st.session_state.get(f"api_key_{provider}", "").strip()
+    for provider, env_name in PROVIDER_BASE_URL_ENV.items():
+        env_values[env_name] = st.session_state.get(f"base_url_{provider}", "").strip()
+    for env_name, _, _ in AZURE_ENV_FIELDS:
+        env_values[env_name] = st.session_state.get(env_name, "").strip()
+    env_values["ALPHA_VANTAGE_API_KEY"] = st.session_state.get("ALPHA_VANTAGE_API_KEY", "").strip()
+    return env_values
+
+
+def save_api_env_file(env_values: dict[str, str]):
+    """Persist local credentials to ~/.tradingagents/.env."""
+    PREFS_DIR.mkdir(parents=True, exist_ok=True)
+    USER_ENV_FILE.touch(exist_ok=True)
+    try:
+        os.chmod(USER_ENV_FILE, 0o600)
+    except OSError:
+        pass
+
+    existing_values = dotenv_values(USER_ENV_FILE)
+    for env_name in MANAGED_ENV_NAMES:
+        if env_name == "ANTHROPIC_AUTH_TOKEN":
+            continue
+        value = env_values.get(env_name, "").strip()
+        if value:
+            set_key(str(USER_ENV_FILE), env_name, value, quote_mode="always")
+        elif env_name in existing_values:
+            unset_key(str(USER_ENV_FILE), env_name)
+
+
+def credential_help_text() -> str:
+    if is_local_persistence_enabled():
+        return f"Saved locally to {USER_ENV_FILE} when you save preferences or run analysis."
+    return "Used only for the current app session. It is not saved to GitHub, Streamlit Secrets, or disk."
 
 
 def get_api_env_values(provider: str) -> dict[str, str]:
@@ -964,7 +1026,7 @@ def render_sidebar():
                 type="password",
                 key=f"api_key_{provider_key}",
                 placeholder=api_key_env,
-                help="Used only for the current app session. It is not saved to GitHub, Streamlit Secrets, or disk.",
+                help=credential_help_text(),
             )
             active_value = st.session_state.get(f"api_key_{provider_key}", "").strip()
             st.session_state.setdefault("api_key_profiles", {}).setdefault(provider_key, {})[profile_id] = active_value
@@ -978,7 +1040,7 @@ def render_sidebar():
                 key=f"base_url_{provider_key}",
                 placeholder=PROVIDER_URLS.get(provider_key) or "https://host.example/v1",
                 help=(
-                    f"Used as {base_url_env} for this session. For OpenAI-compatible providers, "
+                    f"Used as {base_url_env}. For OpenAI-compatible providers, "
                     "use the Chat Completions base URL, usually ending in /v1."
                 ),
             )
@@ -989,7 +1051,7 @@ def render_sidebar():
                     label,
                     key=env_name,
                     placeholder=placeholder,
-                    help="Used only for the current app session. It is not saved to GitHub, Streamlit Secrets, or disk.",
+                    help=credential_help_text(),
                 )
 
         with st.expander("Data API Keys", expanded=False):
@@ -1000,14 +1062,17 @@ def render_sidebar():
                 placeholder="ALPHA_VANTAGE_API_KEY",
                 help=(
                     "Only needed if your TradingAgents data vendor config uses Alpha Vantage."
-                    " Used only for the current app session."
+                    f" {credential_help_text()}"
                 ),
             )
 
         st.divider()
         if st.button("Save Preferences", use_container_width=True):
             save_current_config()
-            st.toast("Preferences saved. API keys stay session-only.", icon="✅")
+            if is_local_persistence_enabled():
+                st.toast("Preferences and local API keys saved.", icon="✅")
+            else:
+                st.toast("Preferences saved. API keys stay session-only.", icon="✅")
 
     api_env_values = get_api_env_values(provider_key)
     return ticker, analysis_date, language, analysts, depth_key, provider_key, quick_model, deep_model, api_env_values

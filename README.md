@@ -96,9 +96,11 @@ To keep it synced while you edit:
 The sync excludes local git metadata, virtualenvs, Python caches, and upload
 scratch files.
 
-API keys are entered in the Streamlit sidebar for the current browser session.
-They are not committed to GitHub, stored in Streamlit Secrets, or persisted to
-disk by the UI. The UI no longer reads `../tradingagents/.env` or requires a
+API keys are entered in the Streamlit sidebar. When launched locally through
+`trade-ui` or `./run.sh`, keys are saved to the UI-owned
+`~/.tradingagents/.env` and loaded automatically next time. In Streamlit
+Community Cloud, keys stay session-only so public deployments do not carry app
+owner credentials. The UI no longer reads `../tradingagents/.env` or requires a
 sibling TradingAgents checkout.
 
 ## Streamlit Community Cloud Deployment
@@ -173,7 +175,9 @@ python3 -m pip install -U git+https://github.com/TauricResearch/TradingAgents.gi
 
 ### Environment Variables & API Keys
 
-Provider credentials are session-only. Non-secret preferences are saved to `~/.tradingagents/ui_preferences.json`.
+Provider credentials are saved locally only when launched through `trade-ui` or
+`./run.sh`; cloud credentials are session-only. Non-secret preferences are saved
+to `~/.tradingagents/ui_preferences.json`.
 
 Most providers follow one of these patterns:
 

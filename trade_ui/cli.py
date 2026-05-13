@@ -254,6 +254,8 @@ def main():
             extra_args.append(args[i])
             i += 1
 
+    os.environ["TRADINGAGENTS_UI_LOCAL"] = "1"
+
     cmd = [sys.executable, "-m", "streamlit", "run", str(app_path),
            "--server.port", port, "--server.headless", "true"]
     if host:
