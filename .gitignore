@@ -4,3 +4,5 @@ scripts/watch-sync-to-app.sh
 *pyc
 .gstack/
 .streamlit/secrets.toml
+tests/
+tradingagents-promo/
