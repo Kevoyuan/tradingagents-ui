@@ -3,7 +3,11 @@
 import base64
 import datetime
 import html as html_lib
+import json
 import os
+import shutil
+import subprocess
+import tempfile
 import threading
 import time
 import traceback
@@ -47,6 +51,8 @@ MANAGED_ENV_NAMES = tuple(
 )
 RUN_ENV_LOCK = threading.Lock()
 USER_ENV_FILE = PREFS_DIR / ".env"
+PROJECT_ROOT = Path(__file__).resolve().parent
+BAOYU_MARKDOWN_TO_HTML_SCRIPT = PROJECT_ROOT / "tools" / "baoyu-markdown-to-html" / "scripts" / "main.ts"
 
 
 def is_local_persistence_enabled() -> bool:
@@ -435,6 +441,53 @@ def normalize_saved_analysts(values) -> list[str]:
     return selected or ["market", "social", "news", "fundamentals"]
 
 
+def get_bun_command() -> list[str]:
+    """Return a Bun command suitable for the vendored baoyu markdown converter."""
+    if shutil.which("bun"):
+        return ["bun"]
+    if shutil.which("npx"):
+        return ["npx", "-y", "bun"]
+    raise RuntimeError("Generate HTML requires `bun` or `npx` to run the bundled markdown converter.")
+
+
+def generate_html_report(markdown_report: str) -> tuple[str, str]:
+    """Generate a self-contained HTML report with the vendored baoyu markdown-to-html skill."""
+    if not BAOYU_MARKDOWN_TO_HTML_SCRIPT.exists():
+        raise RuntimeError(f"Bundled markdown converter not found: {BAOYU_MARKDOWN_TO_HTML_SCRIPT}")
+
+    with tempfile.TemporaryDirectory(prefix="tradingagents-report-") as tmp:
+        markdown_path = Path(tmp) / "tradingagents_report.md"
+        markdown_path.write_text(markdown_report, encoding="utf-8")
+        cmd = [
+            *get_bun_command(),
+            str(BAOYU_MARKDOWN_TO_HTML_SCRIPT),
+            str(markdown_path),
+            "--theme",
+            "modern",
+            "--color",
+            "sky",
+            "--keep-title",
+        ]
+        result = subprocess.run(
+            cmd,
+            cwd=PROJECT_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=120,
+        )
+        if result.returncode != 0:
+            detail = result.stderr.strip() or result.stdout.strip() or f"exit code {result.returncode}"
+            raise RuntimeError(f"HTML generation failed: {detail}")
+
+        try:
+            payload = json.loads(result.stdout)
+            html_path = Path(payload["htmlPath"])
+        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+            raise RuntimeError(f"HTML generation returned invalid output: {result.stdout}") from exc
+        return html_path.read_text(encoding="utf-8"), html_path.name
+
+
 def render_inline_html(html: str, height: int):
     """Render inline HTML using the modern iframe API when available."""
     if hasattr(st, "iframe"):
@@ -583,6 +636,32 @@ def render_report_with_nav(report_content: str, id_prefix: str = "report"):
         else:
             import streamlit.components.v1 as components
             components.html(copy_html, height=45)
+
+        generated_key = f"{id_prefix}_generated_html"
+        filename_key = f"{id_prefix}_generated_html_filename"
+        error_key = f"{id_prefix}_generated_html_error"
+        if st.button("Generate HTML", key=f"{id_prefix}_generate_html", use_container_width=True):
+            st.session_state.pop(generated_key, None)
+            st.session_state.pop(filename_key, None)
+            st.session_state.pop(error_key, None)
+            try:
+                html_report, html_filename = generate_html_report(report_content)
+                st.session_state[generated_key] = html_report
+                st.session_state[filename_key] = html_filename
+            except Exception as exc:
+                st.session_state[error_key] = str(exc)
+
+        if st.session_state.get(error_key):
+            st.error(st.session_state[error_key])
+        if st.session_state.get(generated_key):
+            st.download_button(
+                "Download HTML",
+                data=st.session_state[generated_key],
+                file_name=st.session_state.get(filename_key, "tradingagents_report.html"),
+                mime="text/html",
+                key=f"{id_prefix}_download_html",
+                use_container_width=True,
+            )
 
     with col_content, st.container(height=800, border=False):
         st.markdown('<div class="report-section">', unsafe_allow_html=True)

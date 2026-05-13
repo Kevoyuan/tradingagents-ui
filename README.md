@@ -157,6 +157,7 @@ python3 -m pip install -U git+https://github.com/TauricResearch/TradingAgents.gi
 - **Live Analysis Execution:** Configure parameters (Ticker, Date, Depth) and trigger multi-agent workflows directly from the sidebar.
 - **Real-Time Telemetry:** Monitor agent progress, view live message/tool-call feeds, and track token usage/latency.
 - **Live Report Generation:** View analysis reports updating section-by-section as the agents work.
+- **HTML Report Export:** Generate a standalone HTML report from the Markdown report using the bundled `baoyu-markdown-to-html` converter.
 - **Report History:** Browse and render historical Markdown reports from both global and project-specific directories.
 - **Persistent State:** Automatic saving of UI preferences and API credentials across sessions.
 
@@ -220,6 +221,10 @@ tradingagents-ui/
 ├── ui_styles.py        # Centralized CUSTOM_CSS theme
 ├── ui_panels.py        # Progress/messages/stats panel render helpers
 ├── preferences.py      # Preferences/env persistence
+├── packages.txt        # Streamlit Cloud apt packages for HTML export runtime
+├── tools/
+│   ├── baoyu-markdown-to-html/ # Bundled Markdown-to-HTML converter skill
+│   └── tradingagents-quant-terminal-prompt.md
 ├── trade_ui/
 │   ├── __init__.py
 │   └── cli.py          # CLI entry point (trade-ui command)
