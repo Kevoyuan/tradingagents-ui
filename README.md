@@ -121,6 +121,17 @@ cp .streamlit/secrets.toml.example .streamlit/secrets.toml
 
 Then fill in only the keys you use. `.streamlit/secrets.toml` is gitignored.
 
+At minimum, set an app password before using API keys on a public URL:
+
+```toml
+APP_PASSWORD = "use-a-long-random-password"
+DEEPSEEK_API_KEY = "sk-..."
+```
+
+The password gate protects the app from casual public access. Viewers cannot
+read Streamlit Secrets directly, but without a gate they could still run
+analyses that spend your API credits.
+
 Cloud notes:
 
 - Cloud reports are saved inside the cloud app container and shown in

@@ -3,6 +3,8 @@
 import base64
 import contextlib
 import datetime
+import hashlib
+import hmac
 import html as html_lib
 import os
 import threading
@@ -69,6 +71,73 @@ def load_streamlit_secret_env_values() -> dict[str, str]:
         return values
     except (FileNotFoundError, KeyError, AttributeError, RuntimeError, st.errors.StreamlitAPIException):
         return {}
+
+
+def get_streamlit_secret_value(name: str) -> str:
+    """Read one Streamlit secret without exposing it through widget state."""
+    try:
+        value = st.secrets.get(name, "")
+        if value:
+            return str(value).strip()
+        auth_group = st.secrets.get("auth", {})
+        if hasattr(auth_group, "get"):
+            return str(auth_group.get(name, "")).strip()
+    except (FileNotFoundError, AttributeError, RuntimeError, st.errors.StreamlitAPIException):
+        return ""
+    return ""
+
+
+def get_auth_secret(name: str) -> str:
+    return (
+        os.environ.get(name, "").strip()
+        or get_streamlit_secret_value(name)
+        or get_streamlit_secret_value(name.lower())
+    )
+
+
+def verify_app_password(password: str) -> bool:
+    """Verify the app gate password against a plaintext or SHA-256 secret."""
+    expected_hash = get_auth_secret("APP_PASSWORD_SHA256")
+    if expected_hash:
+        actual_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
+        return hmac.compare_digest(actual_hash, expected_hash.lower())
+
+    expected_password = get_auth_secret("APP_PASSWORD")
+    if expected_password:
+        return hmac.compare_digest(password, expected_password)
+
+    return True
+
+
+def is_app_password_configured() -> bool:
+    return bool(get_auth_secret("APP_PASSWORD") or get_auth_secret("APP_PASSWORD_SHA256"))
+
+
+def require_login() -> bool:
+    """Render a simple password gate when APP_PASSWORD is configured."""
+    if not is_app_password_configured():
+        return True
+    if st.session_state.get("app_authenticated"):
+        return True
+
+    st.markdown(
+        "<div style='max-width:420px;margin:14vh auto 0;'>"
+        "<h1 style='font-size:1.8rem;margin-bottom:0.4rem;'>TradingAgents</h1>"
+        "<p style='color:#8b949e;margin-bottom:1.5rem;'>Enter the app password to continue.</p>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+    _, center, _ = st.columns([1, 1.2, 1])
+    with center, st.form("login_form"):
+        password = st.text_input("Password", type="password", key="login_password")
+        submitted = st.form_submit_button("Sign in", type="primary", use_container_width=True)
+        if submitted:
+            if verify_app_password(password):
+                st.session_state.app_authenticated = True
+                st.session_state.login_password = ""
+                st.rerun()
+            st.error("Incorrect password.")
+    return False
 
 
 def safe_report_filename_part(value: str) -> str:
@@ -208,8 +277,9 @@ def sync_provider_api_key_input(provider: str, profile_id: str):
 def init_session_state():
     if "initialized" not in st.session_state:
         prefs = load_preferences()
-        saved_env = {**load_saved_api_env_values(), **load_streamlit_secret_env_values()}
-        apply_api_env_values(saved_env, override=False)
+        saved_env = load_saved_api_env_values()
+        deployment_secret_env = load_streamlit_secret_env_values()
+        apply_api_env_values({**saved_env, **deployment_secret_env}, override=False)
 
         st.session_state.ticker = prefs.get("ticker", "")
         st.session_state.analysis_date = datetime.date.today().isoformat()
@@ -223,18 +293,15 @@ def init_session_state():
         st.session_state.api_key_profiles = prefs.get("api_key_profiles", {})
 
         for provider, env_name in PROVIDER_API_KEY_ENV.items():
-            st.session_state[f"api_key_{provider}"] = os.environ.get(env_name, saved_env.get(env_name, ""))
+            st.session_state[f"api_key_{provider}"] = saved_env.get(env_name, "")
         for provider, env_name in PROVIDER_BASE_URL_ENV.items():
-            st.session_state[f"base_url_{provider}"] = os.environ.get(
+            st.session_state[f"base_url_{provider}"] = saved_env.get(
                 env_name,
-                saved_env.get(env_name, PROVIDER_URLS.get(provider, "") or ""),
+                PROVIDER_URLS.get(provider, "") or "",
             )
         for env_name, _, _ in AZURE_ENV_FIELDS:
-            st.session_state[env_name] = os.environ.get(env_name, saved_env.get(env_name, ""))
-        st.session_state["ALPHA_VANTAGE_API_KEY"] = os.environ.get(
-            "ALPHA_VANTAGE_API_KEY",
-            saved_env.get("ALPHA_VANTAGE_API_KEY", ""),
-        )
+            st.session_state[env_name] = saved_env.get(env_name, "")
+        st.session_state["ALPHA_VANTAGE_API_KEY"] = saved_env.get("ALPHA_VANTAGE_API_KEY", "")
 
         # Analysis state
         st.session_state.running = False
@@ -1099,7 +1166,16 @@ def main():
 
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
+    if not require_login():
+        return
+
     init_session_state()
+
+    if is_app_password_configured():
+        with st.sidebar:
+            if st.button("Sign out", use_container_width=True):
+                st.session_state.app_authenticated = False
+                st.rerun()
 
     (
         ticker,
