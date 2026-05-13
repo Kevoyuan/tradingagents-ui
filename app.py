@@ -492,9 +492,7 @@ def generate_html_report(markdown_report: str) -> tuple[str, str]:
             str(BAOYU_MARKDOWN_TO_HTML_SCRIPT),
             str(markdown_path),
             "--theme",
-            "modern",
-            "--color",
-            "sky",
+            "quant-terminal",
             "--keep-title",
         ]
         result = subprocess.run(

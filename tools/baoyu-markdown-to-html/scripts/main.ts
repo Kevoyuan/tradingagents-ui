@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import { renderQuantTerminalDocument } from "./quant-terminal.ts";
 
 import {
   COLOR_PRESETS,
@@ -80,20 +81,22 @@ export async function convertMarkdown(
     `[markdown-to-html] Rendering with theme: ${theme ?? "default"}, keepTitle: ${keepTitle}, citeStatus: ${citeStatus}`,
   );
 
-  const { html } = await renderMarkdownDocument(rewrittenMarkdown, {
-    codeTheme: options?.codeTheme,
-    countStatus: options?.countStatus,
-    citeStatus,
-    defaultTitle: title,
-    fontFamily: options?.fontFamily,
-    fontSize: options?.fontSize,
-    isMacCodeBlock: options?.isMacCodeBlock,
-    isShowLineNumber: options?.isShowLineNumber,
-    keepTitle,
-    legend: options?.legend,
-    primaryColor: options?.primaryColor,
-    theme,
-  });
+  const html = theme === "quant-terminal"
+    ? await renderQuantTerminalDocument(rewrittenMarkdown, title, options)
+    : (await renderMarkdownDocument(rewrittenMarkdown, {
+      codeTheme: options?.codeTheme,
+      countStatus: options?.countStatus,
+      citeStatus,
+      defaultTitle: title,
+      fontFamily: options?.fontFamily,
+      fontSize: options?.fontSize,
+      isMacCodeBlock: options?.isMacCodeBlock,
+      isShowLineNumber: options?.isShowLineNumber,
+      keepTitle,
+      legend: options?.legend,
+      primaryColor: options?.primaryColor,
+      theme,
+    })).html;
 
   const finalHtmlPath = markdownPath.replace(/\.md$/i, ".html");
   let backupPath: string | undefined;
@@ -144,7 +147,7 @@ Usage:
 
 Options:
   --title <title>         Override title
-  --theme <name>          Theme name (${THEME_NAMES.join(", ")}). Default: default
+  --theme <name>          Theme name (${THEME_NAMES.join(", ")}, quant-terminal). Default: default
   --color <name|hex>      Primary color: ${colorNames}
   --font-family <name>    Font: ${fontFamilyNames}, or CSS value
   --font-size <N>         Font size: ${FONT_SIZE_OPTIONS.join(", ")} (default: 16px)
