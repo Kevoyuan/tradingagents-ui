@@ -96,9 +96,10 @@ To keep it synced while you edit:
 The sync excludes local git metadata, virtualenvs, Python caches, and upload
 scratch files.
 
-API keys are entered in the Streamlit sidebar and saved to the UI-owned
-`~/.tradingagents/.env`. The UI no longer reads `../tradingagents/.env` or
-requires a sibling TradingAgents checkout.
+API keys are entered in the Streamlit sidebar for the current browser session.
+They are not committed to GitHub, stored in Streamlit Secrets, or persisted to
+disk by the UI. The UI no longer reads `../tradingagents/.env` or requires a
+sibling TradingAgents checkout.
 
 ## Streamlit Community Cloud Deployment
 
@@ -109,28 +110,12 @@ your phone without keeping the local computer reachable.
 2. In Streamlit Community Cloud, create a new app from the repo.
 3. Set **Main file path** to `app.py`.
 4. Keep the Python version at 3.10 or newer.
-5. Add secrets under **App settings > Secrets**. Use
-   `.streamlit/secrets.toml.example` as the template.
+5. Do not add app-level API keys or Streamlit Secrets.
 6. Deploy the app and open the generated URL on your phone or desktop.
 
-For local deployment testing, copy the example secrets file:
-
-```bash
-cp .streamlit/secrets.toml.example .streamlit/secrets.toml
-```
-
-Then fill in only the keys you use. `.streamlit/secrets.toml` is gitignored.
-
-At minimum, set an app password before using API keys on a public URL:
-
-```toml
-APP_PASSWORD = "use-a-long-random-password"
-DEEPSEEK_API_KEY = "sk-..."
-```
-
-The password gate protects the app from casual public access. Viewers cannot
-read Streamlit Secrets directly, but without a gate they could still run
-analyses that spend your API credits.
+Each user enters their own API key in the sidebar before running an analysis.
+Those keys are kept in the current Streamlit session only and are not saved by
+the app.
 
 Cloud notes:
 
@@ -140,8 +125,8 @@ Cloud notes:
 - Local-only providers such as Ollama or `localhost` LiteLLM endpoints are not
   reachable from Streamlit Cloud unless you expose them through a public HTTPS
   endpoint.
-- Do not paste API keys into committed files. Use Streamlit Secrets or the
-  in-app sidebar fields.
+- Do not paste API keys into committed files or app-level Streamlit Secrets for
+  public deployments. Use the in-app sidebar fields.
 
 ## Auto-Update Check
 
@@ -188,7 +173,7 @@ python3 -m pip install -U git+https://github.com/TauricResearch/TradingAgents.gi
 
 ### Environment Variables & API Keys
 
-Provider credentials and configurations are saved to `~/.tradingagents/.env` and loaded automatically. Non-secret preferences are saved to `~/.tradingagents/ui_preferences.json`.
+Provider credentials are session-only. Non-secret preferences are saved to `~/.tradingagents/ui_preferences.json`.
 
 Most providers follow one of these patterns:
 

@@ -1,10 +1,7 @@
 """TradingAgents UI - Lightweight Streamlit wrapper with CLI-style layout."""
 
 import base64
-import contextlib
 import datetime
-import hashlib
-import hmac
 import html as html_lib
 import os
 import threading
@@ -13,11 +10,10 @@ import traceback
 from pathlib import Path
 
 import streamlit as st
-from dotenv import dotenv_values, set_key, unset_key
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.llm_clients.model_catalog import MODEL_OPTIONS
 
-from preferences import PREFS_DIR, load_preferences, save_preferences
+from preferences import load_preferences, save_preferences
 from ui_config import (
     ALL_TEAMS,
     ANALYST_KEY_MAP,
@@ -37,107 +33,18 @@ from ui_config import (
 from ui_panels import render_messages_panel, render_progress_panel
 from ui_styles import CUSTOM_CSS
 
-USER_ENV_FILE = PREFS_DIR / ".env"
-SECRET_ENV_NAMES = tuple(
+MANAGED_ENV_NAMES = tuple(
     dict.fromkeys(
         [
             *PROVIDER_API_KEY_ENV.values(),
             *PROVIDER_BASE_URL_ENV.values(),
             *(env_name for env_name, _, _ in AZURE_ENV_FIELDS),
             "ALPHA_VANTAGE_API_KEY",
+            "ANTHROPIC_AUTH_TOKEN",
         ]
     )
 )
-
-
-def load_streamlit_secret_env_values() -> dict[str, str]:
-    """Load deployment secrets from Streamlit Cloud/local .streamlit/secrets.toml."""
-    try:
-        secrets = st.secrets
-        values = {
-            env_name: str(secrets[env_name]).strip()
-            for env_name in SECRET_ENV_NAMES
-            if env_name in secrets and str(secrets[env_name]).strip()
-        }
-        env_group = secrets.get("env", {})
-        if hasattr(env_group, "items"):
-            values.update(
-                {
-                    env_name: str(value).strip()
-                    for env_name, value in env_group.items()
-                    if env_name in SECRET_ENV_NAMES and value and str(value).strip()
-                }
-            )
-        return values
-    except (FileNotFoundError, KeyError, AttributeError, RuntimeError, st.errors.StreamlitAPIException):
-        return {}
-
-
-def get_streamlit_secret_value(name: str) -> str:
-    """Read one Streamlit secret without exposing it through widget state."""
-    try:
-        value = st.secrets.get(name, "")
-        if value:
-            return str(value).strip()
-        auth_group = st.secrets.get("auth", {})
-        if hasattr(auth_group, "get"):
-            return str(auth_group.get(name, "")).strip()
-    except (FileNotFoundError, AttributeError, RuntimeError, st.errors.StreamlitAPIException):
-        return ""
-    return ""
-
-
-def get_auth_secret(name: str) -> str:
-    return (
-        os.environ.get(name, "").strip()
-        or get_streamlit_secret_value(name)
-        or get_streamlit_secret_value(name.lower())
-    )
-
-
-def verify_app_password(password: str) -> bool:
-    """Verify the app gate password against a plaintext or SHA-256 secret."""
-    expected_hash = get_auth_secret("APP_PASSWORD_SHA256")
-    if expected_hash:
-        actual_hash = hashlib.sha256(password.encode("utf-8")).hexdigest()
-        return hmac.compare_digest(actual_hash, expected_hash.lower())
-
-    expected_password = get_auth_secret("APP_PASSWORD")
-    if expected_password:
-        return hmac.compare_digest(password, expected_password)
-
-    return True
-
-
-def is_app_password_configured() -> bool:
-    return bool(get_auth_secret("APP_PASSWORD") or get_auth_secret("APP_PASSWORD_SHA256"))
-
-
-def require_login() -> bool:
-    """Render a simple password gate when APP_PASSWORD is configured."""
-    if not is_app_password_configured():
-        return True
-    if st.session_state.get("app_authenticated"):
-        return True
-
-    st.markdown(
-        "<div style='max-width:420px;margin:14vh auto 0;'>"
-        "<h1 style='font-size:1.8rem;margin-bottom:0.4rem;'>TradingAgents</h1>"
-        "<p style='color:#8b949e;margin-bottom:1.5rem;'>Enter the app password to continue.</p>"
-        "</div>",
-        unsafe_allow_html=True,
-    )
-    _, center, _ = st.columns([1, 1.2, 1])
-    with center, st.form("login_form"):
-        password = st.text_input("Password", type="password", key="login_password")
-        submitted = st.form_submit_button("Sign in", type="primary", use_container_width=True)
-        if submitted:
-            if verify_app_password(password):
-                st.session_state.app_authenticated = True
-                st.session_state.login_password = ""
-                st.rerun()
-            st.error("Incorrect password.")
-    return False
+RUN_ENV_LOCK = threading.Lock()
 
 
 def safe_report_filename_part(value: str) -> str:
@@ -196,7 +103,7 @@ def get_provider_base_url(provider: str, env_values: dict[str, str] | None = Non
             return env_values[base_url_env]
         if f"base_url_{provider}" in st.session_state:
             return st.session_state.get(f"base_url_{provider}", "").strip() or PROVIDER_URLS.get(provider)
-        return os.environ.get(base_url_env, "") or PROVIDER_URLS.get(provider)
+        return PROVIDER_URLS.get(provider)
     return PROVIDER_URLS.get(provider)
 
 
@@ -208,12 +115,12 @@ def get_runtime_llm_config(provider: str, api_env_values: dict[str, str]) -> tup
     source_api_env = PROVIDER_API_KEY_ENV.get(provider)
     runtime_api_env = PROVIDER_API_KEY_ENV.get(runtime_provider)
     if source_api_env and runtime_api_env and source_api_env != runtime_api_env:
-        source_key = api_env_values.get(source_api_env) or os.environ.get(source_api_env, "")
+        source_key = api_env_values.get(source_api_env, "")
         if source_key:
             runtime_env_values[runtime_api_env] = source_key
             if runtime_provider == "anthropic":
                 runtime_env_values["ANTHROPIC_AUTH_TOKEN"] = source_key
-        elif provider in OPTIONAL_API_KEY_PROVIDERS and not os.environ.get(runtime_api_env):
+        elif provider in OPTIONAL_API_KEY_PROVIDERS:
             runtime_env_values[runtime_api_env] = "sk-no-key-required"
             if runtime_provider == "anthropic":
                 runtime_env_values["ANTHROPIC_AUTH_TOKEN"] = "sk-no-key-required"
@@ -277,9 +184,6 @@ def sync_provider_api_key_input(provider: str, profile_id: str):
 def init_session_state():
     if "initialized" not in st.session_state:
         prefs = load_preferences()
-        saved_env = load_saved_api_env_values()
-        deployment_secret_env = load_streamlit_secret_env_values()
-        apply_api_env_values({**saved_env, **deployment_secret_env}, override=False)
 
         st.session_state.ticker = prefs.get("ticker", "")
         st.session_state.analysis_date = datetime.date.today().isoformat()
@@ -290,18 +194,15 @@ def init_session_state():
         st.session_state.quick_model = prefs.get("quick_think_llm", "")
         st.session_state.deep_model = prefs.get("deep_think_llm", "")
         st.session_state.provider_model_profiles = prefs.get("provider_model_profiles", {})
-        st.session_state.api_key_profiles = prefs.get("api_key_profiles", {})
+        st.session_state.api_key_profiles = {}
 
-        for provider, env_name in PROVIDER_API_KEY_ENV.items():
-            st.session_state[f"api_key_{provider}"] = saved_env.get(env_name, "")
-        for provider, env_name in PROVIDER_BASE_URL_ENV.items():
-            st.session_state[f"base_url_{provider}"] = saved_env.get(
-                env_name,
-                PROVIDER_URLS.get(provider, "") or "",
-            )
+        for provider in PROVIDER_API_KEY_ENV:
+            st.session_state[f"api_key_{provider}"] = ""
+        for provider in PROVIDER_BASE_URL_ENV:
+            st.session_state[f"base_url_{provider}"] = PROVIDER_URLS.get(provider, "") or ""
         for env_name, _, _ in AZURE_ENV_FIELDS:
-            st.session_state[env_name] = saved_env.get(env_name, "")
-        st.session_state["ALPHA_VANTAGE_API_KEY"] = saved_env.get("ALPHA_VANTAGE_API_KEY", "")
+            st.session_state[env_name] = ""
+        st.session_state["ALPHA_VANTAGE_API_KEY"] = ""
 
         # Analysis state
         st.session_state.running = False
@@ -328,51 +229,7 @@ def save_current_config():
         "quick_think_llm": st.session_state.get("quick_model", ""),
         "deep_think_llm": st.session_state.get("deep_model", ""),
         "provider_model_profiles": st.session_state.get("provider_model_profiles", {}),
-        "api_key_profiles": st.session_state.get("api_key_profiles", {}),
     })
-    save_api_env_file(get_all_api_env_values())
-
-
-def load_saved_api_env_values() -> dict[str, str]:
-    """Load persisted user credentials from the UI-owned .env file."""
-    try:
-        raw_values = dotenv_values(USER_ENV_FILE)
-    except OSError:
-        return {}
-    return {
-        env_name: str(value).strip()
-        for env_name, value in raw_values.items()
-        if env_name in SECRET_ENV_NAMES and value
-    }
-
-
-def get_all_api_env_values() -> dict[str, str]:
-    """Collect all secret fields, including currently hidden provider keys."""
-    env_values = {}
-    for provider, env_name in PROVIDER_API_KEY_ENV.items():
-        env_values[env_name] = st.session_state.get(f"api_key_{provider}", "").strip()
-    for provider, env_name in PROVIDER_BASE_URL_ENV.items():
-        env_values[env_name] = st.session_state.get(f"base_url_{provider}", "").strip()
-    for env_name, _, _ in AZURE_ENV_FIELDS:
-        env_values[env_name] = st.session_state.get(env_name, "").strip()
-    env_values["ALPHA_VANTAGE_API_KEY"] = st.session_state.get("ALPHA_VANTAGE_API_KEY", "").strip()
-    return env_values
-
-
-def save_api_env_file(env_values: dict[str, str]):
-    """Persist user credentials to ~/.tradingagents/.env."""
-    PREFS_DIR.mkdir(parents=True, exist_ok=True)
-    USER_ENV_FILE.touch(exist_ok=True)
-    with contextlib.suppress(OSError):
-        os.chmod(USER_ENV_FILE, 0o600)
-
-    existing_values = dotenv_values(USER_ENV_FILE)
-    for env_name in SECRET_ENV_NAMES:
-        value = env_values.get(env_name, "").strip()
-        if value:
-            set_key(str(USER_ENV_FILE), env_name, value, quote_mode="always")
-        elif env_name in existing_values:
-            unset_key(str(USER_ENV_FILE), env_name)
 
 
 def get_api_env_values(provider: str) -> dict[str, str]:
@@ -405,6 +262,9 @@ def get_api_env_values(provider: str) -> dict[str, str]:
 
 def apply_api_env_values(env_values: dict[str, str], override: bool = True):
     """Expose sidebar credentials to TradingAgents."""
+    if override:
+        for env_name in MANAGED_ENV_NAMES:
+            os.environ.pop(env_name, None)
     for env_name, value in env_values.items():
         if value and (override or not os.environ.get(env_name)):
             os.environ[env_name] = value
@@ -416,18 +276,18 @@ def missing_required_credentials(provider: str, env_values: dict[str, str]) -> l
     if (
         api_key_env
         and provider not in OPTIONAL_API_KEY_PROVIDERS
-        and not (env_values.get(api_key_env) or os.environ.get(api_key_env))
+        and not env_values.get(api_key_env)
     ):
         missing.append(api_key_env)
 
     if provider == "azure":
         for env_name, _, _ in AZURE_ENV_FIELDS:
-            if not (env_values.get(env_name) or os.environ.get(env_name)):
+            if not env_values.get(env_name):
                 missing.append(env_name)
 
     base_url_env = PROVIDER_BASE_URL_ENV.get(provider)
     if base_url_env and not (
-        env_values.get(base_url_env) or os.environ.get(base_url_env) or PROVIDER_URLS.get(provider)
+        env_values.get(base_url_env) or PROVIDER_URLS.get(provider)
     ):
         missing.append(base_url_env)
 
@@ -674,211 +534,214 @@ def _run_analysis_thread(
     ticker, date, language, analysts, depth, provider, quick_model, deep_model, api_env_values, state
 ):
     """Run analysis in a background thread, writing results to shared state dict."""
-    runtime_provider, backend_url, runtime_env_values = get_runtime_llm_config(provider, api_env_values)
-    apply_api_env_values(runtime_env_values)
+    with RUN_ENV_LOCK:
+        runtime_provider, backend_url, runtime_env_values = get_runtime_llm_config(provider, api_env_values)
+        apply_api_env_values(runtime_env_values)
 
-    from cli.stats_handler import StatsCallbackHandler
-    from tradingagents.graph.trading_graph import TradingAgentsGraph
+        from cli.stats_handler import StatsCallbackHandler
+        from tradingagents.graph.trading_graph import TradingAgentsGraph
 
-    try:
-        date_str = str(date)
-        chunks = []
-
-        config = DEFAULT_CONFIG.copy()
-        config["max_debate_rounds"] = depth
-        config["max_risk_discuss_rounds"] = depth
-        config["quick_think_llm"] = quick_model
-        config["deep_think_llm"] = deep_model
-        config["backend_url"] = backend_url
-        config["llm_provider"] = runtime_provider
-        config["output_language"] = language
-
-        stats_handler = StatsCallbackHandler()
-
-        # Initialize agent statuses
-        for _team, agents in ALL_TEAMS.items():
-            for agent in agents:
-                # Only include analysts that were selected + always-include agents
-                is_analyst = agent in ANALYST_KEY_MAP.values()
-                if is_analyst:
-                    analyst_key = [k for k, v in ANALYST_KEY_MAP.items() if v == agent][0]
-                    if analyst_key not in analysts:
-                        continue
-                state["agent_status"][agent] = "pending"
-
-        # Set first analyst to in_progress
-        for analyst_key in analysts:
-            agent_name: str | None = ANALYST_KEY_MAP.get(analyst_key)
-            if agent_name and agent_name in state["agent_status"]:
-                state["agent_status"][agent_name] = "in_progress"
-                break
-
-        state["messages"].append((now_str(), "System", f"Analyzing {ticker} on {date_str}"))
-
-        graph = TradingAgentsGraph(analysts, config=config, debug=True, callbacks=[stats_handler])
-        init_state = graph.propagator.create_initial_state(ticker, date_str)
-        args = graph.propagator.get_graph_args(callbacks=[stats_handler])
-
-        seen_message_ids = set()
-        seen_tool_call_ids = set()
-
-        for chunk in graph.graph.stream(init_state, **args):
-            chunks.append(chunk)
-
-            # Extract messages from various chunk formats (updates or full state)
-            msgs_to_process = []
-            if "messages" in chunk:
-                msgs_to_process = chunk["messages"]
-            else:
-                for node_val in chunk.values():
-                    if isinstance(node_val, dict) and "messages" in node_val:
-                        msgs_to_process.extend(node_val["messages"])
-
-            # Process messages with duplicate detection
-            for message in msgs_to_process:
-                # Use message ID if available, otherwise hash the content
-                msg_id = getattr(message, "id", None) or hash(str(message))
-                if msg_id in seen_message_ids:
-                    continue
-                seen_message_ids.add(msg_id)
-
-                mtype, content = classify_message(message)
-                if content:
-                    state["messages"].append((now_str(), mtype, compact_text(content, 300)))
-
-                if hasattr(message, "tool_calls") and message.tool_calls:
-                    for tc in message.tool_calls:
-                        tc_id = tc.get("id") or hash(str(tc))
-                        if tc_id in seen_tool_call_ids:
-                            continue
-                        seen_tool_call_ids.add(tc_id)
-                        name, args = get_tool_call_name_args(tc)
-                        state["tool_calls"].append((now_str(), name, compact_text(args, 80)))
-
-            # Update analyst statuses
-            selected_set = set(analysts)
-            found_active = False
-            for ak in ["market", "social", "news", "fundamentals"]:
-                if ak not in selected_set:
-                    continue
-                agent = ANALYST_KEY_MAP[ak]
-                report_key = ANALYST_REPORT_MAP[ak]
-                if chunk.get(report_key):
-                    state["report_sections"][report_key] = chunk[report_key]
-                has_report = bool(state["report_sections"].get(report_key))
-                if has_report:
-                    state["agent_status"][agent] = "completed"
-                elif not found_active:
-                    state["agent_status"][agent] = "in_progress"
-                    found_active = True
-
-            # Research team
-            if chunk.get("investment_debate_state"):
-                ds = chunk["investment_debate_state"]
-                if ds.get("judge_decision", "").strip():
-                    for a in ["Bull Researcher", "Bear Researcher", "Research Manager"]:
-                        state["agent_status"][a] = "completed"
-                    state["agent_status"]["Trader"] = "in_progress"
-                elif ds.get("bull_history", "").strip() or ds.get("bear_history", "").strip():
-                    for a in ["Bull Researcher", "Bear Researcher", "Research Manager"]:
-                        if state["agent_status"].get(a) == "pending":
-                            state["agent_status"][a] = "in_progress"
-
-            # Trading team
-            if chunk.get("trader_investment_plan"):
-                state["report_sections"]["trader_investment_plan"] = chunk["trader_investment_plan"]
-                if state["agent_status"].get("Trader") != "completed":
-                    state["agent_status"]["Trader"] = "completed"
-                    state["agent_status"]["Aggressive Analyst"] = "in_progress"
-
-            # Risk management
-            if chunk.get("risk_debate_state"):
-                rs = chunk["risk_debate_state"]
-                if rs.get("judge_decision", "").strip():
-                    for a in ["Aggressive Analyst", "Conservative Analyst", "Neutral Analyst", "Portfolio Manager"]:
-                        state["agent_status"][a] = "completed"
-                    state["report_sections"]["final_trade_decision"] = rs["judge_decision"]
-
-            # Update stats
-            stats = stats_handler.get_stats()
-            state["llm_calls"] = stats.get("llm_calls", 0)
-            state["tool_call_count"] = stats.get("tool_calls", 0)
-            state["tokens_in"] = stats.get("tokens_in", 0)
-            state["tokens_out"] = stats.get("tokens_out", 0)
-
-            # Update current report
-            current = state["report_sections"].get("final_trade_decision") or \
-                      state["report_sections"].get("trader_investment_plan") or \
-                      state["report_sections"].get("investment_plan")
-            if current:
-                if isinstance(current, list):
-                    current = "\n".join(str(x) for x in current)
-                state["current_report"] = str(current)
-
-        # Final
-        final_state = chunks[-1] if chunks else {}
-        if final_state.get("final_trade_decision"):
-            graph.process_signal(final_state.get("final_trade_decision", ""))
-
-        # Save reports
-        results_dir = Path(config["results_dir"]) / ticker / date_str
-        results_dir.mkdir(parents=True, exist_ok=True)
-        report_dir = results_dir / "reports"
-        report_dir.mkdir(parents=True, exist_ok=True)
-
-        all_sections = {
-            "market_report": final_state.get("market_report"),
-            "sentiment_report": final_state.get("sentiment_report"),
-            "news_report": final_state.get("news_report"),
-            "fundamentals_report": final_state.get("fundamentals_report"),
-            "investment_plan": final_state.get("investment_plan"),
-            "trader_investment_plan": final_state.get("trader_investment_plan"),
-            "final_trade_decision": final_state.get("final_trade_decision"),
-        }
-        for sn, content in all_sections.items():
-            if content:
-                text = "\n".join(str(i) for i in content) if isinstance(content, list) else str(content)
-                (report_dir / f"{sn}.md").write_text(text, encoding="utf-8")
-
-        complete = []
-        for sn, content in all_sections.items():
-            if content:
-                text = "\n".join(str(i) for i in content) if isinstance(content, list) else str(content)
-                complete.append(f"## {sn.replace('_', ' ').title()}\n\n{text}")
-        complete_report = "\n\n---\n\n".join(complete)
-        complete_report_path = report_dir / "complete_report.md"
-        complete_report_path.write_text(complete_report, encoding="utf-8")
-        model_report_name = (
-            "complete_report__"
-            f"deep-{safe_report_filename_part(deep_model)}.md"
-        )
-        model_report_path = report_dir / model_report_name
-        model_report_path.write_text(complete_report, encoding="utf-8")
-
-        # Create a symlink to the latest report in the user data directory.
-        latest_symlink = Path.home() / ".tradingagents" / "latest_report.md"
         try:
-            latest_symlink.parent.mkdir(parents=True, exist_ok=True)
-            if latest_symlink.exists() or latest_symlink.is_symlink():
-                latest_symlink.unlink()
-            latest_symlink.symlink_to(complete_report_path)
-        except Exception:
-            pass  # Fallback if OS prevents symlinking
+            date_str = str(date)
+            chunks = []
 
-        # Mark all agents completed
-        for a in state["agent_status"]:
-            state["agent_status"][a] = "completed"
+            config = DEFAULT_CONFIG.copy()
+            config["max_debate_rounds"] = depth
+            config["max_risk_discuss_rounds"] = depth
+            config["quick_think_llm"] = quick_model
+            config["deep_think_llm"] = deep_model
+            config["backend_url"] = backend_url
+            config["llm_provider"] = runtime_provider
+            config["output_language"] = language
 
-        state["final_report"] = complete_report
-        state["report_dir"] = str(report_dir)
-        state["messages"].append((now_str(), "System", f"Completed analysis for {date_str}"))
+            stats_handler = StatsCallbackHandler()
 
-    except Exception as e:
-        state["messages"].append((now_str(), "System", f"ERROR: {e}"))
-        state["error"] = str(e)
-        state["traceback"] = traceback.format_exc()
-    finally:
-        state["done"] = True
+            # Initialize agent statuses
+            for _team, agents in ALL_TEAMS.items():
+                for agent in agents:
+                    # Only include analysts that were selected + always-include agents
+                    is_analyst = agent in ANALYST_KEY_MAP.values()
+                    if is_analyst:
+                        analyst_key = [k for k, v in ANALYST_KEY_MAP.items() if v == agent][0]
+                        if analyst_key not in analysts:
+                            continue
+                    state["agent_status"][agent] = "pending"
+
+            # Set first analyst to in_progress
+            for analyst_key in analysts:
+                agent_name: str | None = ANALYST_KEY_MAP.get(analyst_key)
+                if agent_name and agent_name in state["agent_status"]:
+                    state["agent_status"][agent_name] = "in_progress"
+                    break
+
+            state["messages"].append((now_str(), "System", f"Analyzing {ticker} on {date_str}"))
+
+            graph = TradingAgentsGraph(analysts, config=config, debug=True, callbacks=[stats_handler])
+            init_state = graph.propagator.create_initial_state(ticker, date_str)
+            args = graph.propagator.get_graph_args(callbacks=[stats_handler])
+
+            seen_message_ids = set()
+            seen_tool_call_ids = set()
+
+            for chunk in graph.graph.stream(init_state, **args):
+                chunks.append(chunk)
+
+                # Extract messages from various chunk formats (updates or full state)
+                msgs_to_process = []
+                if "messages" in chunk:
+                    msgs_to_process = chunk["messages"]
+                else:
+                    for node_val in chunk.values():
+                        if isinstance(node_val, dict) and "messages" in node_val:
+                            msgs_to_process.extend(node_val["messages"])
+
+                # Process messages with duplicate detection
+                for message in msgs_to_process:
+                    # Use message ID if available, otherwise hash the content
+                    msg_id = getattr(message, "id", None) or hash(str(message))
+                    if msg_id in seen_message_ids:
+                        continue
+                    seen_message_ids.add(msg_id)
+
+                    mtype, content = classify_message(message)
+                    if content:
+                        state["messages"].append((now_str(), mtype, compact_text(content, 300)))
+
+                    if hasattr(message, "tool_calls") and message.tool_calls:
+                        for tc in message.tool_calls:
+                            tc_id = tc.get("id") or hash(str(tc))
+                            if tc_id in seen_tool_call_ids:
+                                continue
+                            seen_tool_call_ids.add(tc_id)
+                            name, args = get_tool_call_name_args(tc)
+                            state["tool_calls"].append((now_str(), name, compact_text(args, 80)))
+
+                # Update analyst statuses
+                selected_set = set(analysts)
+                found_active = False
+                for ak in ["market", "social", "news", "fundamentals"]:
+                    if ak not in selected_set:
+                        continue
+                    agent = ANALYST_KEY_MAP[ak]
+                    report_key = ANALYST_REPORT_MAP[ak]
+                    if chunk.get(report_key):
+                        state["report_sections"][report_key] = chunk[report_key]
+                    has_report = bool(state["report_sections"].get(report_key))
+                    if has_report:
+                        state["agent_status"][agent] = "completed"
+                    elif not found_active:
+                        state["agent_status"][agent] = "in_progress"
+                        found_active = True
+
+                # Research team
+                if chunk.get("investment_debate_state"):
+                    ds = chunk["investment_debate_state"]
+                    if ds.get("judge_decision", "").strip():
+                        for a in ["Bull Researcher", "Bear Researcher", "Research Manager"]:
+                            state["agent_status"][a] = "completed"
+                        state["agent_status"]["Trader"] = "in_progress"
+                    elif ds.get("bull_history", "").strip() or ds.get("bear_history", "").strip():
+                        for a in ["Bull Researcher", "Bear Researcher", "Research Manager"]:
+                            if state["agent_status"].get(a) == "pending":
+                                state["agent_status"][a] = "in_progress"
+
+                # Trading team
+                if chunk.get("trader_investment_plan"):
+                    state["report_sections"]["trader_investment_plan"] = chunk["trader_investment_plan"]
+                    if state["agent_status"].get("Trader") != "completed":
+                        state["agent_status"]["Trader"] = "completed"
+                        state["agent_status"]["Aggressive Analyst"] = "in_progress"
+
+                # Risk management
+                if chunk.get("risk_debate_state"):
+                    rs = chunk["risk_debate_state"]
+                    if rs.get("judge_decision", "").strip():
+                        for a in ["Aggressive Analyst", "Conservative Analyst", "Neutral Analyst", "Portfolio Manager"]:
+                            state["agent_status"][a] = "completed"
+                        state["report_sections"]["final_trade_decision"] = rs["judge_decision"]
+
+                # Update stats
+                stats = stats_handler.get_stats()
+                state["llm_calls"] = stats.get("llm_calls", 0)
+                state["tool_call_count"] = stats.get("tool_calls", 0)
+                state["tokens_in"] = stats.get("tokens_in", 0)
+                state["tokens_out"] = stats.get("tokens_out", 0)
+
+                # Update current report
+                current = state["report_sections"].get("final_trade_decision") or \
+                          state["report_sections"].get("trader_investment_plan") or \
+                          state["report_sections"].get("investment_plan")
+                if current:
+                    if isinstance(current, list):
+                        current = "\n".join(str(x) for x in current)
+                    state["current_report"] = str(current)
+
+            # Final
+            final_state = chunks[-1] if chunks else {}
+            if final_state.get("final_trade_decision"):
+                graph.process_signal(final_state.get("final_trade_decision", ""))
+
+            # Save reports
+            results_dir = Path(config["results_dir"]) / ticker / date_str
+            results_dir.mkdir(parents=True, exist_ok=True)
+            report_dir = results_dir / "reports"
+            report_dir.mkdir(parents=True, exist_ok=True)
+
+            all_sections = {
+                "market_report": final_state.get("market_report"),
+                "sentiment_report": final_state.get("sentiment_report"),
+                "news_report": final_state.get("news_report"),
+                "fundamentals_report": final_state.get("fundamentals_report"),
+                "investment_plan": final_state.get("investment_plan"),
+                "trader_investment_plan": final_state.get("trader_investment_plan"),
+                "final_trade_decision": final_state.get("final_trade_decision"),
+            }
+            for sn, content in all_sections.items():
+                if content:
+                    text = "\n".join(str(i) for i in content) if isinstance(content, list) else str(content)
+                    (report_dir / f"{sn}.md").write_text(text, encoding="utf-8")
+
+            complete = []
+            for sn, content in all_sections.items():
+                if content:
+                    text = "\n".join(str(i) for i in content) if isinstance(content, list) else str(content)
+                    complete.append(f"## {sn.replace('_', ' ').title()}\n\n{text}")
+            complete_report = "\n\n---\n\n".join(complete)
+            complete_report_path = report_dir / "complete_report.md"
+            complete_report_path.write_text(complete_report, encoding="utf-8")
+            model_report_name = (
+                "complete_report__"
+                f"deep-{safe_report_filename_part(deep_model)}.md"
+            )
+            model_report_path = report_dir / model_report_name
+            model_report_path.write_text(complete_report, encoding="utf-8")
+
+            # Create a symlink to the latest report in the user data directory.
+            latest_symlink = Path.home() / ".tradingagents" / "latest_report.md"
+            try:
+                latest_symlink.parent.mkdir(parents=True, exist_ok=True)
+                if latest_symlink.exists() or latest_symlink.is_symlink():
+                    latest_symlink.unlink()
+                latest_symlink.symlink_to(complete_report_path)
+            except Exception:
+                pass  # Fallback if OS prevents symlinking
+
+            # Mark all agents completed
+            for a in state["agent_status"]:
+                state["agent_status"][a] = "completed"
+
+            state["final_report"] = complete_report
+            state["report_dir"] = str(report_dir)
+            state["messages"].append((now_str(), "System", f"Completed analysis for {date_str}"))
+
+        except Exception as e:
+            state["messages"].append((now_str(), "System", f"ERROR: {e}"))
+            state["error"] = str(e)
+            state["traceback"] = traceback.format_exc()
+        finally:
+            for env_name in MANAGED_ENV_NAMES:
+                os.environ.pop(env_name, None)
+            state["done"] = True
 
 
 # ── UI Renderers ───────────────────────────────────────────────────────────────
@@ -1101,15 +964,10 @@ def render_sidebar():
                 type="password",
                 key=f"api_key_{provider_key}",
                 placeholder=api_key_env,
-                help=(
-                    f"Saved to {USER_ENV_FILE} when you save preferences or run analysis. "
-                    "Also remembered per provider/model profile."
-                ),
+                help="Used only for the current app session. It is not saved to GitHub, Streamlit Secrets, or disk.",
             )
             active_value = st.session_state.get(f"api_key_{provider_key}", "").strip()
             st.session_state.setdefault("api_key_profiles", {}).setdefault(provider_key, {})[profile_id] = active_value
-            if os.environ.get(api_key_env):
-                st.caption(f"{api_key_env} is already available in the current environment.")
         else:
             st.caption("Ollama does not require an API key.")
 
@@ -1120,8 +978,8 @@ def render_sidebar():
                 key=f"base_url_{provider_key}",
                 placeholder=PROVIDER_URLS.get(provider_key) or "https://host.example/v1",
                 help=(
-                    f"Saved as {base_url_env}. For OpenAI-compatible providers, use the Chat "
-                    "Completions base URL, usually ending in /v1."
+                    f"Used as {base_url_env} for this session. For OpenAI-compatible providers, "
+                    "use the Chat Completions base URL, usually ending in /v1."
                 ),
             )
 
@@ -1131,10 +989,8 @@ def render_sidebar():
                     label,
                     key=env_name,
                     placeholder=placeholder,
-                    help=f"Saved to {USER_ENV_FILE} when you save preferences or run analysis.",
+                    help="Used only for the current app session. It is not saved to GitHub, Streamlit Secrets, or disk.",
                 )
-                if os.environ.get(env_name):
-                    st.caption(f"{env_name} is already available in the current environment.")
 
         with st.expander("Data API Keys", expanded=False):
             st.text_input(
@@ -1144,16 +1000,14 @@ def render_sidebar():
                 placeholder="ALPHA_VANTAGE_API_KEY",
                 help=(
                     "Only needed if your TradingAgents data vendor config uses Alpha Vantage."
-                    f" Saved to {USER_ENV_FILE}."
+                    " Used only for the current app session."
                 ),
             )
-            if os.environ.get("ALPHA_VANTAGE_API_KEY"):
-                st.caption("ALPHA_VANTAGE_API_KEY is already available in the current environment.")
 
         st.divider()
         if st.button("Save Preferences", use_container_width=True):
             save_current_config()
-            st.toast("Preferences and API keys saved!", icon="✅")
+            st.toast("Preferences saved. API keys stay session-only.", icon="✅")
 
     api_env_values = get_api_env_values(provider_key)
     return ticker, analysis_date, language, analysts, depth_key, provider_key, quick_model, deep_model, api_env_values
@@ -1166,16 +1020,7 @@ def main():
 
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
-    if not require_login():
-        return
-
     init_session_state()
-
-    if is_app_password_configured():
-        with st.sidebar:
-            if st.button("Sign out", use_container_width=True):
-                st.session_state.app_authenticated = False
-                st.rerun()
 
     (
         ticker,
