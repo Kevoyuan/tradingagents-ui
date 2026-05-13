@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 PREFS_DIR = Path.home() / ".tradingagents"
 PREFS_FILE = PREFS_DIR / "ui_preferences.json"
@@ -12,11 +12,12 @@ def _ensure_dir():
     PREFS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def load_preferences() -> dict:
+def load_preferences() -> dict[str, object]:
     """Load preferences from disk. Returns empty dict if file missing/corrupt."""
     try:
         if PREFS_FILE.exists():
-            return json.loads(PREFS_FILE.read_text(encoding="utf-8"))
+            data: dict[str, object] = json.loads(PREFS_FILE.read_text(encoding="utf-8"))
+            return data
     except (json.JSONDecodeError, OSError):
         pass
     return {}
