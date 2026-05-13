@@ -507,7 +507,7 @@ def render_inline_html(html: str, height: int):
     components.html(html, height=height)
 
 
-def render_report_with_nav(report_content: str, id_prefix: str = "report", quick_model: str | None = None):
+def render_report_with_nav(report_content: str, id_prefix: str = "report"):
     """Render report with a navigation sidebar in the left column."""
     import re
     if not report_content:
@@ -646,7 +646,7 @@ def render_report_with_nav(report_content: str, id_prefix: str = "report", quick
             use_container_width=True,
             help=(
                 "Deterministic Markdown-to-HTML export. It does not call an LLM or spend tokens. "
-                "If a model-backed exporter is added later, it should default to the Quick-Thinking model."
+                "It only converts the existing Markdown report."
             ),
         ):
             st.session_state.pop(generated_key, None)
@@ -661,10 +661,7 @@ def render_report_with_nav(report_content: str, id_prefix: str = "report", quick
 
         if st.session_state.get(error_key):
             st.error(st.session_state[error_key])
-        if quick_model:
-            st.caption(f"HTML export is no-token. Model-backed fallback default: Quick-Thinking `{quick_model}`.")
-        else:
-            st.caption("HTML export is no-token and does not call a model.")
+        st.caption("HTML export is no-token and does not call a model.")
         if st.session_state.get(generated_key):
             st.download_button(
                 "Download HTML",
@@ -957,11 +954,7 @@ def render_analysis_view(analysis_state: dict, selected_analysts: list[str]):
         '<div class="panel"><div class="scanning-line"></div><div class="panel-title">Analysis Report</div>',
         unsafe_allow_html=True,
     )
-    render_report_with_nav(
-        report or "",
-        id_prefix="live",
-        quick_model=analysis_state.get("quick_model"),
-    )
+    render_report_with_nav(report or "", id_prefix="live")
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Stats bar
@@ -1325,7 +1318,6 @@ def main():
                     "tokens_in": st.session_state.tokens_in,
                     "tokens_out": st.session_state.tokens_out,
                     "start_time": st.session_state.start_time,
-                    "quick_model": quick_model,
                 },
                 analysts,
             )
