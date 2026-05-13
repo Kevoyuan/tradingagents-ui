@@ -53,6 +53,8 @@ RUN_ENV_LOCK = threading.Lock()
 USER_ENV_FILE = PREFS_DIR / ".env"
 PROJECT_ROOT = Path(__file__).resolve().parent
 BAOYU_MARKDOWN_TO_HTML_SCRIPT = PROJECT_ROOT / "tools" / "baoyu-markdown-to-html" / "scripts" / "main.ts"
+BAOYU_MARKDOWN_TO_HTML_DIR = BAOYU_MARKDOWN_TO_HTML_SCRIPT.parent
+BAOYU_INSTALL_LOCK = threading.Lock()
 
 
 def is_local_persistence_enabled() -> bool:
@@ -450,10 +452,37 @@ def get_bun_command() -> list[str]:
     raise RuntimeError("Generate HTML requires `bun` or `npx` to run the bundled markdown converter.")
 
 
+def ensure_baoyu_dependencies():
+    """Install vendored converter dependencies on first use."""
+    package_json = BAOYU_MARKDOWN_TO_HTML_DIR / "package.json"
+    marked_package = BAOYU_MARKDOWN_TO_HTML_DIR / "node_modules" / "marked" / "package.json"
+    if marked_package.exists():
+        return
+    if not package_json.exists():
+        raise RuntimeError(f"Bundled markdown converter package.json not found: {package_json}")
+
+    with BAOYU_INSTALL_LOCK:
+        if marked_package.exists():
+            return
+        cmd = [*get_bun_command(), "install"]
+        result = subprocess.run(
+            cmd,
+            cwd=BAOYU_MARKDOWN_TO_HTML_DIR,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=180,
+        )
+        if result.returncode != 0:
+            detail = result.stderr.strip() or result.stdout.strip() or f"exit code {result.returncode}"
+            raise RuntimeError(f"Failed to install HTML converter dependencies: {detail}")
+
+
 def generate_html_report(markdown_report: str) -> tuple[str, str]:
     """Generate a self-contained HTML report with the vendored baoyu markdown-to-html skill."""
     if not BAOYU_MARKDOWN_TO_HTML_SCRIPT.exists():
         raise RuntimeError(f"Bundled markdown converter not found: {BAOYU_MARKDOWN_TO_HTML_SCRIPT}")
+    ensure_baoyu_dependencies()
 
     with tempfile.TemporaryDirectory(prefix="tradingagents-report-") as tmp:
         markdown_path = Path(tmp) / "tradingagents_report.md"
