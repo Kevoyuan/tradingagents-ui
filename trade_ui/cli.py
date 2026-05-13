@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -203,6 +204,16 @@ def _check_tradingagents_updates() -> bool:
     return True
 
 
+def _get_lan_ip() -> str | None:
+    """Best-effort LAN IP detection for phone/tablet access hints."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("8.8.8.8", 80))
+            return sock.getsockname()[0]
+    except OSError:
+        return None
+
+
 def main():
     if "--help" in sys.argv or "-h" in sys.argv:
         print("Usage: trade-ui [OPTIONS]")
@@ -212,6 +223,8 @@ def main():
         print("Options:")
         print("  --help, -h    Show this message")
         print("  --port PORT   Specify server port (default: 8501)")
+        print("  --host HOST   Bind server address (use 0.0.0.0 for phone/LAN access)")
+        print("  --lan         Shortcut for --host 0.0.0.0")
         print()
         print("All other options are passed to Streamlit.")
         sys.exit(0)
@@ -223,6 +236,7 @@ def main():
 
     # Build streamlit command
     port = "8501"
+    host = None
     extra_args = []
     args = sys.argv[1:]
     i = 0
@@ -230,15 +244,29 @@ def main():
         if args[i] == "--port" and i + 1 < len(args):
             port = args[i + 1]
             i += 2
+        elif args[i] == "--host" and i + 1 < len(args):
+            host = args[i + 1]
+            i += 2
+        elif args[i] == "--lan":
+            host = "0.0.0.0"
+            i += 1
         else:
             extra_args.append(args[i])
             i += 1
 
     cmd = [sys.executable, "-m", "streamlit", "run", str(app_path),
            "--server.port", port, "--server.headless", "true"]
+    if host:
+        cmd.extend(["--server.address", host])
     cmd.extend(extra_args)
 
     print(f"Launching UI from: {app_path}")
+    if host == "0.0.0.0":
+        lan_ip = _get_lan_ip()
+        if lan_ip:
+            print(f"Phone/LAN URL: http://{lan_ip}:{port}")
+        else:
+            print(f"Phone/LAN URL: http://<your-computer-ip>:{port}")
     print()
     os.execvp(cmd[0], cmd)
 

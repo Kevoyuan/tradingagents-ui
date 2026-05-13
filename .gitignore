@@ -2,3 +2,5 @@ scripts/sync-to-app.sh
 scripts/watch-sync-to-app.sh
 *__pycache__/*
 *pyc
+.gstack/
+.streamlit/secrets.toml

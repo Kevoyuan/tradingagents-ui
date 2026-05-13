@@ -1,21 +1,21 @@
 """TradingAgents UI - Lightweight Streamlit wrapper with CLI-style layout."""
 
-import os
-import time
-import datetime
-import threading
-import html as html_lib
-import traceback
 import base64
+import contextlib
+import datetime
+import html as html_lib
+import os
+import threading
+import time
+import traceback
 from pathlib import Path
 
 import streamlit as st
 from dotenv import dotenv_values, set_key, unset_key
-
-from preferences import PREFS_DIR, load_preferences, save_preferences
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.llm_clients.model_catalog import MODEL_OPTIONS
 
+from preferences import PREFS_DIR, load_preferences, save_preferences
 from ui_config import (
     ALL_TEAMS,
     ANALYST_KEY_MAP,
@@ -25,12 +25,12 @@ from ui_config import (
     DEPTH_OPTIONS,
     LANGUAGES,
     OPTIONAL_API_KEY_PROVIDERS,
-    PROVIDERS,
     PROVIDER_API_KEY_ENV,
     PROVIDER_BASE_URL_ENV,
     PROVIDER_MODEL_OPTIONS,
     PROVIDER_RUNTIME,
     PROVIDER_URLS,
+    PROVIDERS,
 )
 from ui_panels import render_messages_panel, render_progress_panel
 from ui_styles import CUSTOM_CSS
@@ -46,6 +46,29 @@ SECRET_ENV_NAMES = tuple(
         ]
     )
 )
+
+
+def load_streamlit_secret_env_values() -> dict[str, str]:
+    """Load deployment secrets from Streamlit Cloud/local .streamlit/secrets.toml."""
+    try:
+        secrets = st.secrets
+        values = {
+            env_name: str(secrets[env_name]).strip()
+            for env_name in SECRET_ENV_NAMES
+            if env_name in secrets and str(secrets[env_name]).strip()
+        }
+        env_group = secrets.get("env", {})
+        if hasattr(env_group, "items"):
+            values.update(
+                {
+                    env_name: str(value).strip()
+                    for env_name, value in env_group.items()
+                    if env_name in SECRET_ENV_NAMES and value and str(value).strip()
+                }
+            )
+        return values
+    except (FileNotFoundError, KeyError, AttributeError, RuntimeError, st.errors.StreamlitAPIException):
+        return {}
 
 
 def safe_report_filename_part(value: str) -> str:
@@ -74,7 +97,7 @@ def get_model_id(provider: str, mode: str, display: str) -> str:
     if p in MODEL_OPTIONS and mode in MODEL_OPTIONS[p]:
         for d, mid in MODEL_OPTIONS[p][mode]:
             if d == display:
-                return mid
+                return str(mid)
     return display
 
 
@@ -85,7 +108,7 @@ def get_model_display(provider: str, mode: str, model_id: str, choices: list[str
         return None
     for display, mid in provider_options[mode]:
         if model_id == mid or model_id in display:
-            return display
+            return str(display)
     return choices[-1] if choices and get_model_id(provider, mode, choices[-1]) == "custom" else None
 
 
@@ -150,7 +173,7 @@ def render_model_selector(label: str, provider: str, mode: str, saved_model: str
 def get_saved_provider_model(provider: str, mode: str, fallback: str) -> str:
     profiles = st.session_state.setdefault("provider_model_profiles", {})
     provider_profile = profiles.get(provider, {})
-    return provider_profile.get(mode, fallback)
+    return str(provider_profile.get(mode, fallback))
 
 
 def remember_provider_models(provider: str, quick_model: str, deep_model: str):
@@ -185,7 +208,7 @@ def sync_provider_api_key_input(provider: str, profile_id: str):
 def init_session_state():
     if "initialized" not in st.session_state:
         prefs = load_preferences()
-        saved_env = load_saved_api_env_values()
+        saved_env = {**load_saved_api_env_values(), **load_streamlit_secret_env_values()}
         apply_api_env_values(saved_env, override=False)
 
         st.session_state.ticker = prefs.get("ticker", "")
@@ -273,10 +296,8 @@ def save_api_env_file(env_values: dict[str, str]):
     """Persist user credentials to ~/.tradingagents/.env."""
     PREFS_DIR.mkdir(parents=True, exist_ok=True)
     USER_ENV_FILE.touch(exist_ok=True)
-    try:
+    with contextlib.suppress(OSError):
         os.chmod(USER_ENV_FILE, 0o600)
-    except OSError:
-        pass
 
     existing_values = dotenv_values(USER_ENV_FILE)
     for env_name in SECRET_ENV_NAMES:
@@ -318,9 +339,8 @@ def get_api_env_values(provider: str) -> dict[str, str]:
 def apply_api_env_values(env_values: dict[str, str], override: bool = True):
     """Expose sidebar credentials to TradingAgents."""
     for env_name, value in env_values.items():
-        if value:
-            if override or not os.environ.get(env_name):
-                os.environ[env_name] = value
+        if value and (override or not os.environ.get(env_name)):
+            os.environ[env_name] = value
 
 
 def missing_required_credentials(provider: str, env_values: dict[str, str]) -> list[str]:
@@ -339,7 +359,9 @@ def missing_required_credentials(provider: str, env_values: dict[str, str]) -> l
                 missing.append(env_name)
 
     base_url_env = PROVIDER_BASE_URL_ENV.get(provider)
-    if base_url_env and not (env_values.get(base_url_env) or os.environ.get(base_url_env) or PROVIDER_URLS.get(provider)):
+    if base_url_env and not (
+        env_values.get(base_url_env) or os.environ.get(base_url_env) or PROVIDER_URLS.get(provider)
+    ):
         missing.append(base_url_env)
 
     return missing
@@ -430,13 +452,16 @@ def render_inline_html(html: str, height: int):
         encoded = base64.b64encode(html.encode("utf-8")).decode("ascii")
         src = f"data:text/html;base64,{encoded}"
         try:
-            st.iframe(src, height=height, scrolling=False)
+            st.iframe(src, height=height, scrolling=False)  # type: ignore[call-arg]
         except TypeError:
             st.iframe(src, height=height)
         return
 
-    import streamlit.components.v1 as components
+    if hasattr(st, "html"):
+        st.html(html)
+        return
 
+    import streamlit.components.v1 as components
     components.html(html, height=height)
 
 
@@ -467,7 +492,7 @@ def render_report_with_nav(report_content: str, id_prefix: str = "report"):
                 # Inject anchor before header with spacing to not break markdown
                 lines.append(f'\n<div id="{unique_slug}"></div>\n')
         lines.append(line)
-    
+
     processed_content = "\n".join(lines)
 
     if not toc:
@@ -484,18 +509,21 @@ def render_report_with_nav(report_content: str, id_prefix: str = "report"):
             for level, title, slug in toc:
                 indent = (level - 1) * 16
                 level_class = f"nav-level-{level}"
-                nav_html += f'<a href="#{slug}" target="_self" class="report-nav-item {level_class}" style="padding-left: {12+indent}px;">{title}</a>'
+                nav_html += (
+                    f'<a href="#{slug}" target="_self" class="report-nav-item {level_class}"'
+                    f' style="padding-left: {12+indent}px;">{title}</a>'
+                )
             nav_html += '</div>'
             st.markdown(nav_html, unsafe_allow_html=True)
-        
+
         # Copy Button via inline iframe
         import json
-        
+
         # ensure_ascii=False keeps Chinese characters readable, escaping for JS script block
         safe_content = json.dumps(report_content, ensure_ascii=False)
         # Avoid closing script tag prematurely if the content happens to contain </script>
         safe_content = safe_content.replace("</script>", "<\\/script>")
-        
+
         copy_html = f"""
         <style>
         body {{ margin: 0; padding: 0; background: transparent; overflow: hidden; }}
@@ -525,18 +553,18 @@ def render_report_with_nav(report_content: str, id_prefix: str = "report"):
         </style>
         <button id="copy-btn" class="report-copy-btn">COPY MARKDOWN</button>
         <script>
-            const content = {safe_content}; 
+            const content = {safe_content};
             const btn = document.getElementById("copy-btn");
             btn.onclick = function() {{
-                navigator.clipboard.writeText(content).then(() => {{ 
-                    btn.innerText = "COPIED!"; 
+                navigator.clipboard.writeText(content).then(() => {{
+                    btn.innerText = "COPIED!";
                     btn.style.background = "#00ff88";
                     btn.style.color = "#000";
-                    setTimeout(() => {{ 
-                        btn.innerText = "COPY MARKDOWN"; 
+                    setTimeout(() => {{
+                        btn.innerText = "COPY MARKDOWN";
                         btn.style.background = "transparent";
                         btn.style.color = "#00ff88";
-                    }}, 2000); 
+                    }}, 2000);
                 }}).catch(err => {{
                     // Fallback
                     const textArea = document.createElement("textarea");
@@ -545,14 +573,14 @@ def render_report_with_nav(report_content: str, id_prefix: str = "report"):
                     textArea.select();
                     try {{
                         document.execCommand("copy");
-                        btn.innerText = "COPIED!"; 
+                        btn.innerText = "COPIED!";
                         btn.style.background = "#00ff88";
                         btn.style.color = "#000";
-                        setTimeout(() => {{ 
-                            btn.innerText = "COPY MARKDOWN"; 
+                        setTimeout(() => {{
+                            btn.innerText = "COPY MARKDOWN";
                             btn.style.background = "transparent";
                             btn.style.color = "#00ff88";
-                        }}, 2000); 
+                        }}, 2000);
                     }} catch(e) {{
                         btn.innerText = "ERROR";
                     }}
@@ -561,14 +589,16 @@ def render_report_with_nav(report_content: str, id_prefix: str = "report"):
             }};
         </script>
         """
-        import streamlit.components.v1 as components
-        components.html(copy_html, height=45)
+        if hasattr(st, "html"):
+            st.html(copy_html)
+        else:
+            import streamlit.components.v1 as components
+            components.html(copy_html, height=45)
 
-    with col_content:
-        with st.container(height=800, border=False):
-            st.markdown(f'<div class="report-section">', unsafe_allow_html=True)
-            st.markdown(processed_content, unsafe_allow_html=True)
-            st.markdown(f'</div>', unsafe_allow_html=True)
+    with col_content, st.container(height=800, border=False):
+        st.markdown('<div class="report-section">', unsafe_allow_html=True)
+        st.markdown(processed_content, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ── Analysis Runner (background thread) ────────────────────────────────────────
@@ -580,8 +610,8 @@ def _run_analysis_thread(
     runtime_provider, backend_url, runtime_env_values = get_runtime_llm_config(provider, api_env_values)
     apply_api_env_values(runtime_env_values)
 
-    from tradingagents.graph.trading_graph import TradingAgentsGraph
     from cli.stats_handler import StatsCallbackHandler
+    from tradingagents.graph.trading_graph import TradingAgentsGraph
 
     try:
         date_str = str(date)
@@ -599,7 +629,7 @@ def _run_analysis_thread(
         stats_handler = StatsCallbackHandler()
 
         # Initialize agent statuses
-        for team, agents in ALL_TEAMS.items():
+        for _team, agents in ALL_TEAMS.items():
             for agent in agents:
                 # Only include analysts that were selected + always-include agents
                 is_analyst = agent in ANALYST_KEY_MAP.values()
@@ -611,9 +641,9 @@ def _run_analysis_thread(
 
         # Set first analyst to in_progress
         for analyst_key in analysts:
-            agent = ANALYST_KEY_MAP.get(analyst_key)
-            if agent and agent in state["agent_status"]:
-                state["agent_status"][agent] = "in_progress"
+            agent_name: str | None = ANALYST_KEY_MAP.get(analyst_key)
+            if agent_name and agent_name in state["agent_status"]:
+                state["agent_status"][agent_name] = "in_progress"
                 break
 
         state["messages"].append((now_str(), "System", f"Analyzing {ticker} on {date_str}"))
@@ -624,7 +654,7 @@ def _run_analysis_thread(
 
         seen_message_ids = set()
         seen_tool_call_ids = set()
-        
+
         for chunk in graph.graph.stream(init_state, **args):
             chunks.append(chunk)
 
@@ -788,7 +818,9 @@ def _run_analysis_thread(
 
 
 
-def render_stats_bar(agent_status, llm_calls, tool_calls, tokens_in, tokens_out, report_sections, start_time, selected_analysts):
+def render_stats_bar(
+    agent_status, llm_calls, tool_calls, tokens_in, tokens_out, report_sections, start_time, selected_analysts,
+):
     """Render the footer stats bar."""
     completed = sum(1 for s in agent_status.values() if s == "completed")
     total = len(agent_status)
@@ -819,7 +851,8 @@ def render_analysis_view(analysis_state: dict, selected_analysts: list[str]):
             analysis_state.get("agent_status", {}), selected_analysts
         )
         st.markdown(
-            f'<div class="panel top-panel"><div class="scanning-line"></div><div class="panel-title">Progress</div>{progress_html}</div>',
+            '<div class="panel top-panel"><div class="scanning-line"></div>'
+            f'<div class="panel-title">Progress</div>{progress_html}</div>',
             unsafe_allow_html=True,
         )
 
@@ -829,14 +862,19 @@ def render_analysis_view(analysis_state: dict, selected_analysts: list[str]):
             analysis_state.get("tool_calls", []),
         )
         st.markdown(
-            f'<div class="panel messages-panel"><div class="scanning-line"></div><div class="panel-title">Messages &amp; Tools</div><div class="messages-scroll">{messages_html}</div></div>',
+            '<div class="panel messages-panel"><div class="scanning-line"></div>'
+            '<div class="panel-title">Messages &amp; Tools</div>'
+            f'<div class="messages-scroll">{messages_html}</div></div>',
             unsafe_allow_html=True,
         )
 
     # Report section
     report = analysis_state.get("current_report") or analysis_state.get("final_report")
-    st.markdown(f'<div class="panel"><div class="scanning-line"></div><div class="panel-title">Analysis Report</div>', unsafe_allow_html=True)
-    render_report_with_nav(report, id_prefix="live")
+    st.markdown(
+        '<div class="panel"><div class="scanning-line"></div><div class="panel-title">Analysis Report</div>',
+        unsafe_allow_html=True,
+    )
+    render_report_with_nav(report or "", id_prefix="live")
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Stats bar
@@ -871,7 +909,7 @@ def browse_reports_ui():
         return
 
     # Let user pick a report — sort by creation time, newest first
-    entries = []
+    entries: list[dict[str, object]] = []
     for rp in report_dirs:
         parent = rp.parent.name
         name = rp.name
@@ -888,9 +926,9 @@ def browse_reports_ui():
                 "sort_time": created_time,
             }
         )
-    entries.sort(key=lambda x: x["sort_time"], reverse=True)
-    labels = [item["label"] for item in entries]
-    label_to_path = {item["label"]: item["report_path"] for item in entries}
+    entries.sort(key=lambda x: x["sort_time"], reverse=True)  # type: ignore[arg-type,return-value]
+    labels = [str(item["label"]) for item in entries]
+    label_to_path: dict[str, Path] = {str(item["label"]): Path(str(item["report_path"])) for item in entries}
 
     selected = st.selectbox(
         "Select a report",
@@ -914,9 +952,12 @@ def browse_reports_ui():
 def render_sidebar():
     with st.sidebar:
         st.markdown(
-            '<div style="padding:0.5rem 0 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 1.5rem;">'
-            '<div style="font-size:2.2rem;font-weight:800;color:#00ff88;letter-spacing:-0.03em;line-height:1.1;text-shadow: 0 0 12px rgba(0,255,136,0.4);">TradingAgents</div>'
-            '<div style="font-size:0.75rem;color:#8b949e;font-family:\'JetBrains Mono\',monospace;opacity:0.8;margin-top:0.6rem;letter-spacing:0.05em;">'
+            '<div style="padding:0.5rem 0 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);'
+            ' margin-bottom: 1.5rem;">'
+            '<div style="font-size:2.2rem;font-weight:800;color:#00ff88;letter-spacing:-0.03em;'
+            'line-height:1.1;text-shadow: 0 0 12px rgba(0,255,136,0.4);">TradingAgents</div>'
+            '<div style="font-size:0.75rem;color:#8b949e;font-family:\'JetBrains Mono\',monospace;'
+            'opacity:0.8;margin-top:0.6rem;letter-spacing:0.05em;">'
             'v1.2.0 &middot; INDUSTRIAL CONTROL PANEL</div></div>',
             unsafe_allow_html=True,
         )
@@ -941,13 +982,19 @@ def render_sidebar():
             format_func=lambda v: next(k for k, val in ANALYST_OPTIONS if val == v))
         st.session_state.analysts = analysts
 
-        depth_key = st.selectbox("Research Depth", list(DEPTH_OPTIONS.keys()),
-            index=list(DEPTH_OPTIONS.keys()).index(st.session_state.depth_key) if st.session_state.depth_key in DEPTH_OPTIONS else 2)
+        depth_key = st.selectbox(
+            "Research Depth", list(DEPTH_OPTIONS.keys()),
+            index=list(DEPTH_OPTIONS.keys()).index(st.session_state.depth_key)
+            if st.session_state.depth_key in DEPTH_OPTIONS else 2,
+        )
         st.session_state.depth_key = depth_key
 
         provider_display = [d for d, _ in PROVIDERS]
         provider_keys = [k for _, k in PROVIDERS]
-        provider_idx = provider_keys.index(st.session_state.provider) if st.session_state.provider in provider_keys else 4
+        provider_idx = (
+            provider_keys.index(st.session_state.provider)
+            if st.session_state.provider in provider_keys else 4
+        )
         provider = st.selectbox("LLM Provider", provider_display, index=provider_idx)
         provider_key = provider_keys[provider_display.index(provider)]
         st.session_state.provider = provider_key
@@ -1028,7 +1075,10 @@ def render_sidebar():
                 type="password",
                 key="ALPHA_VANTAGE_API_KEY",
                 placeholder="ALPHA_VANTAGE_API_KEY",
-                help=f"Only needed if your TradingAgents data vendor config uses Alpha Vantage. Saved to {USER_ENV_FILE}.",
+                help=(
+                    "Only needed if your TradingAgents data vendor config uses Alpha Vantage."
+                    f" Saved to {USER_ENV_FILE}."
+                ),
             )
             if os.environ.get("ALPHA_VANTAGE_API_KEY"):
                 st.caption("ALPHA_VANTAGE_API_KEY is already available in the current environment.")
@@ -1091,7 +1141,8 @@ def main():
                 f"<b>{html_lib.escape(summary['ticker'])}</b> &middot; {html_lib.escape(summary['date'])} &middot; "
                 f"{html_lib.escape(summary['language'])} &middot; {html_lib.escape(summary['provider'])} &middot; "
                 f"{html_lib.escape(summary['depth'])}<br>"
-                f"Quick: {html_lib.escape(summary['quick'])} &middot; Deep: {html_lib.escape(summary['deep'])} &middot; "
+                f"Quick: {html_lib.escape(summary['quick'])} &middot; "
+                f"Deep: {html_lib.escape(summary['deep'])} &middot; "
                 f"Analysts: {html_lib.escape(summary['analysts'])}</div>",
                 unsafe_allow_html=True,
             )
