@@ -60,7 +60,10 @@ def render_messages_panel(messages: list, tool_calls: list):
     return html
 
 
-def render_stats_bar(agent_status, llm_calls, tool_calls, tokens_in, tokens_out, report_sections, start_time, selected_analysts, report_total_for_analysts, format_tokens, time_module):
+def render_stats_bar(
+    agent_status, llm_calls, tool_calls, tokens_in, tokens_out, report_sections,
+    start_time, selected_analysts, report_total_for_analysts, format_tokens, time_module,
+):
     """Render the footer stats bar."""
     completed = sum(1 for s in agent_status.values() if s == "completed")
     total = len(agent_status)

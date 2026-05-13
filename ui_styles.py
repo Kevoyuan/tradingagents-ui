@@ -2,11 +2,20 @@
 
 CUSTOM_CSS = """
 <style>
-/* Modern typography */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-
 .stApp {
     font-family: 'Inter', sans-serif;
+}
+
+/* CLS Prevention: reserve space for Streamlit widgets */
+.stSelectbox, .stMultiSelect, .stTextInput, .stDateInput, .stTimeInput {
+    min-height: 2.5rem;
+}
+.stButton {
+    min-height: 2.5rem;
+}
+/* Stabilize sidebar to prevent collapse/expand CLS */
+[data-testid="stSidebar"] > div {
+    contain: layout style;
 }
 
 /* Premium Noise Texture Overlay */
