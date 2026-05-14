@@ -1,12 +1,17 @@
 """TradingAgents UI - Lightweight Streamlit wrapper with CLI-style layout."""
 
+from __future__ import annotations
+
 import datetime
 import html as html_lib
+import importlib.metadata
+import importlib.util
 import json
 import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -15,8 +20,13 @@ from pathlib import Path
 
 import streamlit as st
 from dotenv import dotenv_values, set_key, unset_key
-from tradingagents.default_config import DEFAULT_CONFIG
-from tradingagents.llm_clients.model_catalog import MODEL_OPTIONS
+
+try:
+    from tradingagents.default_config import DEFAULT_CONFIG
+    from tradingagents.llm_clients.model_catalog import MODEL_OPTIONS
+except ModuleNotFoundError:
+    DEFAULT_CONFIG = {}
+    MODEL_OPTIONS = {}
 
 from preferences import PREFS_DIR, load_preferences, save_preferences
 from ui_config import (
@@ -56,10 +66,167 @@ BAOYU_MARKDOWN_TO_HTML_SCRIPT = PROJECT_ROOT / "tools" / "baoyu-markdown-to-html
 BAOYU_MARKDOWN_TO_HTML_DIR = BAOYU_MARKDOWN_TO_HTML_SCRIPT.parent
 BAOYU_INSTALL_LOCK = threading.Lock()
 HTML_REPORT_THEME_VERSION = "quant-terminal-readme-shot-v2"
+TRADINGAGENTS_REPO_URL = "https://github.com/TauricResearch/TradingAgents.git"
 
 
 def is_local_persistence_enabled() -> bool:
     return os.environ.get("TRADINGAGENTS_UI_LOCAL") == "1"
+
+
+def find_tradingagents_checkout() -> Path | None:
+    """Return an explicitly configured local TradingAgents checkout, if present."""
+    env_dir = os.environ.get("TRADINGAGENTS_DIR")
+    if not env_dir:
+        return None
+    candidate = Path(env_dir).expanduser().resolve()
+    return candidate if (candidate / ".git").exists() else None
+
+
+def is_tradingagents_installed() -> bool:
+    return importlib.util.find_spec("tradingagents") is not None
+
+
+def installed_tradingagents_version() -> str:
+    try:
+        return importlib.metadata.version("tradingagents")
+    except importlib.metadata.PackageNotFoundError:
+        return "unknown"
+
+
+def git_output(args: list[str], cwd: Path | None = None, timeout: int = 15) -> str:
+    return subprocess.check_output(
+        args,
+        cwd=cwd,
+        stderr=subprocess.STDOUT,
+        text=True,
+        timeout=timeout,
+    ).strip()
+
+
+def tag_sort_key(tag: str) -> tuple:
+    """Best-effort version-ish sort key for git tags such as v0.1.2."""
+    parts = re.split(r"([0-9]+)", tag.lstrip("vV"))
+    return tuple((0, int(part)) if part.isdigit() else (1, part.lower()) for part in parts)
+
+
+def normalize_version_tag(value: object) -> str:
+    """Normalize package versions and git tags enough for update comparisons."""
+    cleaned = str(value or "").strip()
+    if not cleaned or cleaned in {"unknown", "missing"}:
+        return ""
+    return cleaned.split("+", 1)[0].lstrip("vV")
+
+
+def latest_remote_tradingagents_tag() -> str:
+    output = git_output(["git", "ls-remote", "--tags", "--refs", TRADINGAGENTS_REPO_URL], timeout=20)
+    tags = []
+    for line in output.splitlines():
+        ref = line.rsplit("/", 1)[-1].strip()
+        if ref:
+            tags.append(ref)
+    return sorted(tags, key=tag_sort_key)[-1] if tags else "unknown"
+
+
+def latest_local_checkout_tag(repo_dir: Path) -> str:
+    try:
+        return git_output(["git", "describe", "--tags", "--abbrev=0", "HEAD"], cwd=repo_dir, timeout=10)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        return "unknown"
+
+
+def checkout_has_local_changes(repo_dir: Path) -> bool:
+    try:
+        return bool(git_output(["git", "status", "--porcelain"], cwd=repo_dir, timeout=10))
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        return True
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def cached_tradingagents_update_status() -> dict[str, str | bool]:
+    """Check GitHub update status for TradingAgents without mutating the environment."""
+    checkout = find_tradingagents_checkout()
+    try:
+        remote_tag = latest_remote_tradingagents_tag()
+    except Exception as exc:
+        return {
+            "mode": "local checkout" if checkout else "installed package",
+            "installed": is_tradingagents_installed(),
+            "installed_version": installed_tradingagents_version(),
+            "local_tag": latest_local_checkout_tag(checkout) if checkout else "unknown",
+            "remote_tag": "unknown",
+            "dirty": checkout_has_local_changes(checkout) if checkout else False,
+            "update_available": False,
+            "error": str(exc),
+        }
+
+    if checkout:
+        local_tag = latest_local_checkout_tag(checkout)
+        dirty = checkout_has_local_changes(checkout)
+        return {
+            "mode": "local checkout",
+            "path": str(checkout),
+            "installed": is_tradingagents_installed(),
+            "installed_version": installed_tradingagents_version(),
+            "local_tag": local_tag,
+            "remote_tag": remote_tag,
+            "dirty": dirty,
+            "update_available": bool(remote_tag != "unknown" and local_tag != "unknown" and remote_tag != local_tag),
+            "error": "",
+        }
+
+    installed = is_tradingagents_installed()
+    installed_version = installed_tradingagents_version() if installed else "missing"
+    normalized_installed = normalize_version_tag(installed_version)
+    normalized_remote = normalize_version_tag(remote_tag)
+    return {
+        "mode": "installed package",
+        "installed": installed,
+        "installed_version": installed_version,
+        "local_tag": "unknown",
+        "remote_tag": remote_tag,
+        "dirty": False,
+        "update_available": bool(
+            (not installed)
+            or (normalized_installed and normalized_remote and normalized_installed != normalized_remote)
+        ),
+        "error": "",
+    }
+
+
+def should_show_tradingagents_update_icon(status: dict[str, str | bool]) -> bool:
+    """Only surface the update control when the silent check found useful action."""
+    return bool(status.get("update_available") and not status.get("error"))
+
+
+def update_tradingagents_from_app(status: dict[str, str | bool]) -> tuple[bool, str]:
+    """Install or update TradingAgents from the Streamlit app."""
+    checkout_path = status.get("path")
+    if checkout_path:
+        repo_dir = Path(str(checkout_path))
+        if checkout_has_local_changes(repo_dir):
+            return False, f"Local TradingAgents checkout has uncommitted changes: {repo_dir}"
+        try:
+            try:
+                subprocess.run(["git", "pull", "--ff-only"], cwd=repo_dir, check=True, text=True, capture_output=True)
+            except subprocess.CalledProcessError:
+                subprocess.run(["git", "pull", "--rebase"], cwd=repo_dir, check=True, text=True, capture_output=True)
+            subprocess.run([sys.executable, "-m", "pip", "install", "-e", str(repo_dir), "--quiet"], check=True)
+            return True, f"Updated local TradingAgents checkout: {repo_dir}"
+        except subprocess.CalledProcessError as exc:
+            detail = (exc.stderr or exc.stdout or str(exc)).strip()
+            return False, detail
+
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-U", f"git+{TRADINGAGENTS_REPO_URL}", "--quiet"],
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+        return True, "Installed or updated TradingAgents from GitHub."
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.stderr or exc.stdout or str(exc)).strip()
+        return False, detail
 
 
 def safe_report_filename_part(value: str) -> str:
@@ -790,13 +957,13 @@ def _run_analysis_thread(
 ):
     """Run analysis in a background thread, writing results to shared state dict."""
     with RUN_ENV_LOCK:
-        runtime_provider, backend_url, runtime_env_values = get_runtime_llm_config(provider, api_env_values)
-        apply_api_env_values(runtime_env_values)
-
-        from cli.stats_handler import StatsCallbackHandler
-        from tradingagents.graph.trading_graph import TradingAgentsGraph
-
         try:
+            runtime_provider, backend_url, runtime_env_values = get_runtime_llm_config(provider, api_env_values)
+            apply_api_env_values(runtime_env_values)
+
+            from cli.stats_handler import StatsCallbackHandler
+            from tradingagents.graph.trading_graph import TradingAgentsGraph
+
             date_str = str(date)
             chunks = []
 
@@ -1172,18 +1339,48 @@ def browse_reports_ui():
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 
+def render_sidebar_brand():
+    update_status = cached_tradingagents_update_status()
+    show_update_icon = should_show_tradingagents_update_icon(update_status)
+    brand_html = (
+        '<div style="padding:0.5rem 0 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);'
+        ' margin-bottom: 1.5rem;">'
+        '<div style="font-size:2.2rem;font-weight:800;color:#00ff88;letter-spacing:-0.03em;'
+        'line-height:1.1;text-shadow: 0 0 12px rgba(0,255,136,0.4);">TradingAgents</div>'
+        '<div style="font-size:0.75rem;color:#8b949e;font-family:\'JetBrains Mono\',monospace;'
+        'opacity:0.8;margin-top:0.6rem;letter-spacing:0.05em;">'
+        'v1.2.0 &middot; INDUSTRIAL CONTROL PANEL</div></div>'
+    )
+
+    if not show_update_icon:
+        st.markdown(brand_html, unsafe_allow_html=True)
+        return
+
+    logo_col, update_col = st.columns([0.82, 0.18], vertical_alignment="top")
+    with logo_col:
+        st.markdown(brand_html, unsafe_allow_html=True)
+    with update_col:
+        st.markdown("<div style='height:0.42rem'></div>", unsafe_allow_html=True)
+        help_text = (
+            f"Update TradingAgents to {update_status.get('remote_tag', 'the latest GitHub version')}"
+        )
+        can_update = not bool(update_status.get("dirty"))
+        if st.button("↥", key="tradingagents_update_icon", help=help_text, disabled=not can_update):
+            with st.spinner("Updating TradingAgents..."):
+                ok, message = update_tradingagents_from_app(update_status)
+            cached_tradingagents_update_status.clear()
+            if ok:
+                st.success(message)
+                st.caption("Restart the app to make sure loaded TradingAgents modules refresh.")
+            else:
+                st.error(message)
+        if update_status.get("dirty"):
+            st.caption("Local changes")
+
+
 def render_sidebar():
     with st.sidebar:
-        st.markdown(
-            '<div style="padding:0.5rem 0 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);'
-            ' margin-bottom: 1.5rem;">'
-            '<div style="font-size:2.2rem;font-weight:800;color:#00ff88;letter-spacing:-0.03em;'
-            'line-height:1.1;text-shadow: 0 0 12px rgba(0,255,136,0.4);">TradingAgents</div>'
-            '<div style="font-size:0.75rem;color:#8b949e;font-family:\'JetBrains Mono\',monospace;'
-            'opacity:0.8;margin-top:0.6rem;letter-spacing:0.05em;">'
-            'v1.2.0 &middot; INDUSTRIAL CONTROL PANEL</div></div>',
-            unsafe_allow_html=True,
-        )
+        render_sidebar_brand()
 
         ticker = st.text_input("Ticker Symbol", value=st.session_state.ticker, placeholder="SPY, NVDA, 0700.HK")
         ticker = ticker.strip().upper()

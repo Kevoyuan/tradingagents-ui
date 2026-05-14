@@ -1,8 +1,161 @@
 # TradingAgents UI
 
-A lightweight Streamlit web interface for [TradingAgents](https://github.com/TauricResearch/TradingAgents) — Multi-Agents LLM Financial Trading Framework.
+[中文说明](README_zh.md)
 
-## Screenshots
+A local web app for [TradingAgents](https://github.com/TauricResearch/TradingAgents). Open it like a desktop app, enter your settings, run an analysis, and read the report in the same window.
+
+![Embedded HTML report](images/trade-ui-embedded-html-report.png)
+
+## One-Click Launch
+
+### macOS
+
+Create the app once:
+
+```bash
+./scripts/install-macos-app.sh
+```
+
+Then double-click:
+
+```text
+TradingAgents UI.app
+```
+
+It starts the local Streamlit server and opens `http://localhost:8501` in a standalone Chrome/Edge app window.
+
+`TradingAgents UI.app` is macOS-only. On Windows, use the `.bat` launcher below.
+
+### Windows
+
+After the first install, double-click:
+
+```text
+scripts\launch-local-webapp.bat
+```
+
+It starts the local server in the background and opens:
+
+```text
+http://localhost:8501
+```
+
+For a more app-like workflow, create a desktop shortcut to the `.bat` file.
+
+### All Platforms
+
+```bash
+trade-ui
+```
+
+From this checkout during local development:
+
+```bash
+./run.sh
+```
+
+## First Install
+
+```bash
+git clone https://github.com/Kevoyuan/tradingagents-ui.git
+cd tradingagents-ui
+python3 -m pip install -e .
+```
+
+Then choose your launcher:
+
+- macOS: run `./scripts/install-macos-app.sh`, then double-click `TradingAgents UI.app`
+- Windows: double-click `scripts\launch-local-webapp.bat`
+- Linux/other: run `trade-ui`
+
+## How To Use
+
+1. Open the local UI
+2. Fill in ticker, date, language, analyst team, model, and API keys in the sidebar
+3. Click **Run Analysis**
+4. Open **Browse Reports** when the analysis is done
+5. Read the embedded HTML report, or switch back to Markdown
+
+API keys are saved locally for the next launch. Cloud deployments keep keys session-only.
+
+## Built-In TradingAgents Update Check
+
+The app silently checks GitHub once when it opens.
+
+If an update is available, an update icon appears next to the **TradingAgents** logo in the upper-left sidebar. If the icon is not there, the app did not detect an available update.
+
+Click the icon to install or update TradingAgents from GitHub. Restart the app afterward so already-loaded Python modules refresh cleanly.
+
+## Reports
+
+Browse Reports shows embedded HTML by default, so you do not need a separate browser window.
+
+You can:
+
+- Select a report, switch HTML/Markdown, and copy Markdown from one toolbar
+- Jump through sections with the report table of contents
+- Use fixed Top/Bottom buttons for long reports
+- Read reports in the dark Quant Terminal theme
+
+Historical reports are stored under:
+
+```text
+~/.tradingagents/logs/.../reports/
+```
+
+## Phone Access
+
+When your computer and phone are on the same Wi-Fi:
+
+```bash
+trade-ui --lan
+```
+
+or:
+
+```bash
+./run-lan.sh
+```
+
+Open the printed URL on your phone, for example:
+
+```text
+http://192.168.1.23:8501
+```
+
+## Cloud Deploy
+
+Deploy to Streamlit Community Cloud if you want access without keeping your computer online:
+
+1. Push this repo to GitHub
+2. Create a new Streamlit Community Cloud app
+3. Set Main file path to `app.py`
+4. Use Python 3.10 or newer
+5. Do not store API keys in code or app secrets
+6. Deploy and open the generated URL
+
+Cloud notes:
+
+- Each user enters their own API key in the sidebar
+- Cloud reports live inside the cloud container and are best for temporary viewing
+- Local-only services such as Ollama or localhost LiteLLM are not reachable from Streamlit Cloud
+
+## Features
+
+- One-click local launch
+- macOS standalone app window
+- Windows double-click launcher
+- Sidebar setup for ticker, date, language, analyst team, model, and API keys
+- Built-in TradingAgents GitHub update check
+- Live agent progress, messages, tool calls, token counts, and timing
+- Embedded historical HTML reports
+- One-click Markdown copy
+- HTML/Markdown view switch
+- Report table of contents plus Top/Bottom navigation
+- Local preference and API key persistence
+- Same-Wi-Fi phone access
+
+## More Screenshots
 
 ### Live Analysis Monitor
 
@@ -16,249 +169,38 @@ A lightweight Streamlit web interface for [TradingAgents](https://github.com/Tau
 
 ![Report history](images/trade-ui-history-reports.png)
 
-### Embedded HTML Report
+## Developer Notes
 
-![Embedded HTML report](images/trade-ui-embedded-html-report.png)
+UI entrypoint priority:
 
-## Quick Start
+1. `TRADINGAGENTS_UI_APP_PATH`
+2. `./app.py` in the current directory
+3. Packaged fallback `app.py`
 
-After the one-time install, launch the UI from any terminal:
-
-```bash
-trade-ui
-```
-
-`trade-ui` checks TradingAgents updates, configures the runtime, and opens the
-web app at `http://localhost:8501`.
-
-### Launch as a local macOS app
-
-To avoid typing commands each time, create the double-click launcher once:
-
-```bash
-./scripts/install-macos-app.sh
-```
-
-Then open `TradingAgents UI.app` from this project folder. It starts the
-Streamlit server in the background if needed and opens `http://localhost:8501`
-in a standalone Chrome/Edge app window, falling back to your default browser
-when neither is installed. Logs are written to
-`~/Library/Logs/tradingagents-ui/streamlit.log`.
-
-The launcher is meant for daily use: no terminal window, no browser tab chrome,
-and no repeated command entry. If the Streamlit server is already running, it
-just opens the local UI window.
-
-UI entrypoint selection priority:
-
-- `TRADINGAGENTS_UI_APP_PATH` (explicit override)
-- `./app.py` in your current working directory
-- packaged fallback path inside the installed `trade-ui`
-
-The CLI prints the absolute `app.py` path before launch, so you can verify which code is running.
-
-### Use from your phone on the same Wi-Fi
-
-Launch the UI in LAN mode:
-
-```bash
-trade-ui --lan
-```
-
-or from this checkout:
-
-```bash
-./run-lan.sh
-```
-
-The terminal prints a phone URL such as `http://192.168.1.23:8501`.
-Open that URL on your phone while the computer and phone are on the same
-network. If macOS asks for permission, allow incoming network connections for
-Python/Streamlit.
-
-Reports generated by the app are still saved on the computer under
-`~/.tradingagents/logs/.../reports/` and can be viewed from the phone in the
-**Browse Reports** tab while the app is running.
-
-Useful variants:
-
-```bash
-trade-ui --lan --port 8502
-trade-ui --host 0.0.0.0 --server.enableCORS false --server.enableXsrfProtection false
-```
-
-### Setup (first time)
-
-```bash
-git clone https://github.com/Kevoyuan/tradingagents-ui.git
-cd tradingagents-ui
-python3 -m pip install -e .
-```
-
-Make sure the Python scripts directory is in your `PATH` so the `trade-ui`
-command is available. For local development, `./run.sh` launches through the
-same `trade-ui` wrapper.
-
-### Sync development changes to the installed app checkout
-
-If `trade-ui` is running from the app-managed checkout under
-`~/.local/share/tradingagents-ui/projects/tradingagents-ui`, sync your local
-development checkout into that app checkout:
-
-```bash
-./scripts/sync-to-app.sh
-```
-
-To keep it synced while you edit:
-
-```bash
-./scripts/watch-sync-to-app.sh
-```
-
-The sync excludes local git metadata, virtualenvs, Python caches, and upload
-scratch files.
-
-API keys are entered in the Streamlit sidebar. When launched locally through
-`trade-ui` or `./run.sh`, keys are saved to the UI-owned
-`~/.tradingagents/.env` and loaded automatically next time. In Streamlit
-Community Cloud, keys stay session-only so public deployments do not carry app
-owner credentials. The UI no longer reads `../tradingagents/.env` or requires a
-sibling TradingAgents checkout.
-
-## Streamlit Community Cloud Deployment
-
-You can deploy this repo to Streamlit Community Cloud to access the UI from
-your phone without keeping the local computer reachable.
-
-1. Push the repo to GitHub.
-2. In Streamlit Community Cloud, create a new app from the repo.
-3. Set **Main file path** to `app.py`.
-4. Keep the Python version at 3.10 or newer.
-5. Do not add app-level API keys or Streamlit Secrets.
-6. Deploy the app and open the generated URL on your phone or desktop.
-
-Each user enters their own API key in the sidebar before running an analysis.
-Those keys are kept in the current Streamlit session only and are not saved by
-the app.
-
-Cloud notes:
-
-- Cloud reports are saved inside the cloud app container and shown in
-  **Browse Reports** for that running app instance. For long-term archival,
-  download/copy important Markdown reports or keep running local/LAN mode.
-- Local-only providers such as Ollama or `localhost` LiteLLM endpoints are not
-  reachable from Streamlit Cloud unless you expose them through a public HTTPS
-  endpoint.
-- Do not paste API keys into committed files or app-level Streamlit Secrets for
-  public deployments. Use the in-app sidebar fields.
-
-## Auto-Update Check
-
-Both `trade-ui` and `./run.sh` check TradingAgents before launching the UI.
-By default, `trade-ui` treats TradingAgents as a normal Python dependency: if it
-is missing, it offers to install it from GitHub; if it is installed, it can offer
-to update the installed package directly from GitHub.
-
-For development only, you can point `trade-ui` at a local TradingAgents checkout:
+For a local TradingAgents checkout:
 
 ```bash
 export TRADINGAGENTS_DIR=/path/to/tradingagents
 ```
 
-When `TRADINGAGENTS_DIR` is set, `trade-ui` compares tags, offers to pull the
-latest version, and reinstalls that checkout into the current Python environment.
-If the checkout has local changes, `trade-ui` skips the automatic pull so it
-does not overwrite your work.
-
-```bash
-python3 -m pip install -U git+https://github.com/TauricResearch/TradingAgents.git
-```
-
-## Features
-
-- **Live Analysis Execution:** Configure parameters (Ticker, Date, Depth) and trigger multi-agent workflows directly from the sidebar.
-- **Real-Time Telemetry:** Monitor agent progress, view live message/tool-call feeds, and track token usage/latency.
-- **Live Report Generation:** View analysis reports updating section-by-section as the agents work.
-- **Embedded HTML Reports:** Browse historical reports as polished HTML directly inside Streamlit, with Markdown still available as a fallback view.
-- **Compact Report Toolbar:** Pick a report, switch HTML/Markdown, and copy Markdown from one line so the report gets more vertical space.
-- **Report Navigation:** Use the in-report table of contents plus fixed Top/Bottom controls to move through long reports without losing context.
-- **Polished Quant Terminal Theme:** Dark-mode HTML reports use compact hero spacing, readable metadata, subtle scrollbars, and a scan-friendly layout.
-- **HTML Report Export:** Generate self-contained HTML from Markdown using the bundled `baoyu-markdown-to-html` converter.
-- **Report History:** Browse historical Markdown and generated HTML reports from both global and project-specific directories.
-- **Persistent State:** Automatic saving of UI preferences and API credentials across sessions.
-
-## Configuration
-
-### Analysis Settings
-
-| Option | Description |
-|--------|-------------|
-| **Ticker Symbol** | e.g. `SPY`, `NVDA`, `0700.HK` |
-| **Analysis Date** | `YYYY-MM-DD` (defaults to today on launch) |
-| **Output Language** | English, Chinese, Japanese, etc. |
-| **Analysts Team** | Select combinations: Market, Social, News, Fundamentals |
-| **Research Depth** | Shallow / Medium / Deep |
-| **LLM Provider** | Choose between TradingAgents-native or custom compatible endpoints |
-
-### Environment Variables & API Keys
-
-Provider credentials are saved locally only when launched through `trade-ui` or
-`./run.sh`; cloud credentials are session-only. Non-secret preferences are saved
-to `~/.tradingagents/ui_preferences.json`.
-
-Most providers follow one of these patterns:
-
-- **Native provider:** `<PROVIDER>_API_KEY`  
-  Example: `OPENAI_API_KEY`
-- **Custom compatible provider:** `<PROVIDER>_API_KEY` + `<PROVIDER>_BASE_URL`  
-  Example: `MIMO_API_KEY` + `MIMO_BASE_URL`
-
-Commonly used keys:
-
-- Native: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, `AZURE_OPENAI_API_KEY`
-- Custom: `MOONSHOT_API_KEY` + `MOONSHOT_BASE_URL`, `MIMO_API_KEY` + `MIMO_BASE_URL`, `LITELLM_API_KEY` + `LITELLM_BASE_URL`
-
-Azure extra fields: `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT_NAME`, `OPENAI_API_VERSION`  
-Data vendor keys (e.g. Alpha Vantage) can be entered under **Data API Keys**.
-
-<details>
-<summary>Full supported key list</summary>
-
-Native providers: `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `DASHSCOPE_API_KEY`, `ZHIPU_API_KEY`, `OPENROUTER_API_KEY`, `AZURE_OPENAI_API_KEY`  
-Compatible presets: `GLM_CN_API_KEY`, `GLM_CN_BASE_URL`, `GLM_GLOBAL_API_KEY`, `GLM_GLOBAL_BASE_URL`, `KIMI_API_KEY`, `KIMI_BASE_URL`, `MOONSHOT_API_KEY`, `MOONSHOT_BASE_URL`, `MINIMAX_CN_API_KEY`, `MINIMAX_CN_BASE_URL`, `MINIMAX_GLOBAL_API_KEY`, `MINIMAX_GLOBAL_BASE_URL`, `DEEPSEEK_ANTHROPIC_API_KEY`, `DEEPSEEK_ANTHROPIC_BASE_URL`, `ARK_API_KEY`, `ARK_BASE_URL`, `MIMO_API_KEY`, `MIMO_BASE_URL`, `MIMO_TOKENPLAN_API_KEY`, `MIMO_TOKENPLAN_BASE_URL`, `BAILIAN_API_KEY`, `BAILIAN_BASE_URL`, `OLLAMA_ANTHROPIC_API_KEY`, `OLLAMA_ANTHROPIC_BASE_URL`, `LITELLM_API_KEY`, `LITELLM_BASE_URL`, `CUSTOM_OPENAI_API_KEY`, `CUSTOM_OPENAI_BASE_URL`, `CUSTOM_ANTHROPIC_API_KEY`, `CUSTOM_ANTHROPIC_BASE_URL`
-
-</details>
-
-## Architecture
-
-The UI has been split into focused modules to keep `app.py` readable and reduce merge friction:
-
-- `app.py` coordinates app lifecycle, state, and TradingAgents execution.
-- `ui_config.py` stores provider metadata, option lists, and shared constants.
-- `ui_styles.py` stores the full Streamlit CSS theme.
-- `ui_panels.py` renders Progress / Messages / Stats HTML panels.
-
-### Project Structure
+Project layout:
 
 ```text
 tradingagents-ui/
-├── app.py              # Streamlit entrypoint + analysis orchestration
-├── ui_config.py        # Providers, model options, team metadata, constants
-├── ui_styles.py        # Centralized CUSTOM_CSS theme
-├── ui_panels.py        # Progress/messages/stats panel render helpers
-├── preferences.py      # Preferences/env persistence
+├── app.py
+├── ui_config.py
+├── ui_styles.py
+├── ui_panels.py
+├── preferences.py
 ├── scripts/
-│   ├── install-macos-app.sh      # Creates TradingAgents UI.app
-│   └── launch-local-webapp.sh    # Background local webapp launcher
-├── packages.txt        # Streamlit Cloud apt packages for HTML export runtime
+│   ├── install-macos-app.sh
+│   ├── launch-local-webapp.sh
+│   └── launch-local-webapp.bat
 ├── tools/
-│   ├── baoyu-markdown-to-html/ # Bundled Markdown-to-HTML converter skill
-│   └── tradingagents-quant-terminal-prompt.md
+│   └── baoyu-markdown-to-html/
 ├── trade_ui/
-│   ├── __init__.py
-│   └── cli.py          # CLI entry point (trade-ui command)
-├── pyproject.toml      # Package config with trade-ui script
-├── run.sh              # Local launch script
-└── .streamlit/
-    └── config.toml     # Dark theme config
+│   └── cli.py
+├── pyproject.toml
+├── run.sh
+└── run-lan.sh
 ```
