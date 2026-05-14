@@ -90,6 +90,8 @@ Click the icon to install or update TradingAgents from GitHub. Restart the app a
 
 Browse Reports shows embedded HTML by default, so you do not need a separate browser window.
 
+Embedded HTML rendering is local-only. It uses the saved Markdown report and does not call an LLM or spend API tokens.
+
 You can:
 
 - Select a report, switch HTML/Markdown, and copy Markdown from one toolbar

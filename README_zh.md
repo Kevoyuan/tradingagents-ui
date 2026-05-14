@@ -90,6 +90,8 @@ API Key 会保存在本机，下次打开自动加载。云端部署时不会保
 
 Browse Reports 默认展示内嵌 HTML 报告，不再需要弹出外部浏览器窗口。
 
+内嵌 HTML 渲染只在本机处理已保存的 Markdown 报告，不会调用 LLM，也不会消耗 API token。
+
 你可以：
 
 - 在同一行选择报告、切换 HTML/Markdown、复制 Markdown
