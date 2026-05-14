@@ -45,6 +45,10 @@ in a standalone Chrome/Edge app window, falling back to your default browser
 when neither is installed. Logs are written to
 `~/Library/Logs/tradingagents-ui/streamlit.log`.
 
+The launcher is meant for daily use: no terminal window, no browser tab chrome,
+and no repeated command entry. If the Streamlit server is already running, it
+just opens the local UI window.
+
 UI entrypoint selection priority:
 
 - `TRADINGAGENTS_UI_APP_PATH` (explicit override)
@@ -243,6 +247,9 @@ tradingagents-ui/
 ├── ui_styles.py        # Centralized CUSTOM_CSS theme
 ├── ui_panels.py        # Progress/messages/stats panel render helpers
 ├── preferences.py      # Preferences/env persistence
+├── scripts/
+│   ├── install-macos-app.sh      # Creates TradingAgents UI.app
+│   └── launch-local-webapp.sh    # Background local webapp launcher
 ├── packages.txt        # Streamlit Cloud apt packages for HTML export runtime
 ├── tools/
 │   ├── baoyu-markdown-to-html/ # Bundled Markdown-to-HTML converter skill
