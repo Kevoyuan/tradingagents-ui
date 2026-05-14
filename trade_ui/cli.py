@@ -225,20 +225,22 @@ def main():
         print("  --port PORT   Specify server port (default: 8501)")
         print("  --host HOST   Bind server address (use 0.0.0.0 for phone/LAN access)")
         print("  --lan         Shortcut for --host 0.0.0.0")
+        print("  --no-update   Skip the interactive TradingAgents update check")
         print()
         print("All other options are passed to Streamlit.")
         sys.exit(0)
 
     app_path = _resolve_app_path()
 
-    if not _check_tradingagents_updates():
+    skip_update = "--no-update" in sys.argv[1:] or os.environ.get("TRADINGAGENTS_UI_NO_UPDATE") == "1"
+    if not skip_update and not _check_tradingagents_updates():
         sys.exit(1)
 
     # Build streamlit command
     port = "8501"
     host = None
     extra_args = []
-    args = sys.argv[1:]
+    args = [arg for arg in sys.argv[1:] if arg != "--no-update"]
     i = 0
     while i < len(args):
         if args[i] == "--port" and i + 1 < len(args):

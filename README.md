@@ -16,6 +16,10 @@ A lightweight Streamlit web interface for [TradingAgents](https://github.com/Tau
 
 ![Report history](images/trade-ui-history-reports.png)
 
+### Embedded HTML Report
+
+![Embedded HTML report](images/trade-ui-embedded-html-report.png)
+
 ## Quick Start
 
 After the one-time install, launch the UI from any terminal:
@@ -26,6 +30,20 @@ trade-ui
 
 `trade-ui` checks TradingAgents updates, configures the runtime, and opens the
 web app at `http://localhost:8501`.
+
+### Launch as a local macOS app
+
+To avoid typing commands each time, create the double-click launcher once:
+
+```bash
+./scripts/install-macos-app.sh
+```
+
+Then open `TradingAgents UI.app` from this project folder. It starts the
+Streamlit server in the background if needed and opens `http://localhost:8501`
+in a standalone Chrome/Edge app window, falling back to your default browser
+when neither is installed. Logs are written to
+`~/Library/Logs/tradingagents-ui/streamlit.log`.
 
 UI entrypoint selection priority:
 
@@ -157,8 +175,12 @@ python3 -m pip install -U git+https://github.com/TauricResearch/TradingAgents.gi
 - **Live Analysis Execution:** Configure parameters (Ticker, Date, Depth) and trigger multi-agent workflows directly from the sidebar.
 - **Real-Time Telemetry:** Monitor agent progress, view live message/tool-call feeds, and track token usage/latency.
 - **Live Report Generation:** View analysis reports updating section-by-section as the agents work.
-- **HTML Report Export:** Generate a standalone HTML report from the Markdown report using the bundled `baoyu-markdown-to-html` converter.
-- **Report History:** Browse and render historical Markdown reports from both global and project-specific directories.
+- **Embedded HTML Reports:** Browse historical reports as polished HTML directly inside Streamlit, with Markdown still available as a fallback view.
+- **Compact Report Toolbar:** Pick a report, switch HTML/Markdown, and copy Markdown from one line so the report gets more vertical space.
+- **Report Navigation:** Use the in-report table of contents plus fixed Top/Bottom controls to move through long reports without losing context.
+- **Polished Quant Terminal Theme:** Dark-mode HTML reports use compact hero spacing, readable metadata, subtle scrollbars, and a scan-friendly layout.
+- **HTML Report Export:** Generate self-contained HTML from Markdown using the bundled `baoyu-markdown-to-html` converter.
+- **Report History:** Browse historical Markdown and generated HTML reports from both global and project-specific directories.
 - **Persistent State:** Automatic saving of UI preferences and API credentials across sessions.
 
 ## Configuration

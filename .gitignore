@@ -6,3 +6,6 @@ scripts/watch-sync-to-app.sh
 .streamlit/secrets.toml
 tests/
 tradingagents-promo/
+node_modules/
+.DS_Store
+*.app/

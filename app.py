@@ -1,6 +1,5 @@
 """TradingAgents UI - Lightweight Streamlit wrapper with CLI-style layout."""
 
-import base64
 import datetime
 import html as html_lib
 import json
@@ -56,6 +55,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 BAOYU_MARKDOWN_TO_HTML_SCRIPT = PROJECT_ROOT / "tools" / "baoyu-markdown-to-html" / "scripts" / "main.ts"
 BAOYU_MARKDOWN_TO_HTML_DIR = BAOYU_MARKDOWN_TO_HTML_SCRIPT.parent
 BAOYU_INSTALL_LOCK = threading.Lock()
+HTML_REPORT_THEME_VERSION = "quant-terminal-readme-shot-v2"
 
 
 def is_local_persistence_enabled() -> bool:
@@ -553,29 +553,159 @@ def generate_html_report(markdown_report: str, metadata: dict[str, str] | None =
         return html_path.read_text(encoding="utf-8"), html_path.name
 
 
-def render_inline_html(html: str, height: int):
-    """Render inline HTML using the modern iframe API when available."""
-    if hasattr(st, "iframe"):
-        encoded = base64.b64encode(html.encode("utf-8")).decode("ascii")
-        src = f"data:text/html;base64,{encoded}"
-        try:
-            st.iframe(src, height=height, scrolling=False)  # type: ignore[call-arg]
-        except TypeError:
-            st.iframe(src, height=height)
-        return
+@st.cache_data(show_spinner=False)
+def cached_generate_html_report(
+    markdown_report: str,
+    metadata_items: tuple[tuple[str, str], ...],
+) -> tuple[str, str]:
+    """Cache deterministic HTML exports so opening a report does not re-run the converter."""
+    return generate_html_report(markdown_report, dict(metadata_items))
 
-    if hasattr(st, "html"):
-        st.html(html)
-        return
 
+def render_open_html_button(html_report: str, key: str):
+    """Render a browser-side button that opens the generated HTML in a new tab."""
     import streamlit.components.v1 as components
-    components.html(html, height=height)
+
+    safe_html = json.dumps(html_report, ensure_ascii=False).replace("</script>", "<\\/script>")
+    open_html = f"""
+    <style>
+    body {{ margin: 0; padding: 0; background: transparent; overflow: hidden; }}
+    .open-html-btn {{
+        width: 100%;
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        color: #f5f5f5;
+        padding: 10px 12px;
+        border-radius: 6px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 0.88rem;
+        font-weight: 650;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: block;
+        box-sizing: border-box;
+    }}
+    .open-html-btn:hover {{
+        border-color: rgba(0, 255, 136, 0.65);
+        color: #00ff88;
+        background: rgba(0, 255, 136, 0.08);
+    }}
+    .open-html-btn:active {{ transform: scale(0.99); }}
+    </style>
+    <button id="{key}" class="open-html-btn">Open HTML</button>
+    <script>
+        const html = {safe_html};
+        const btn = document.getElementById({json.dumps(key)});
+        btn.onclick = function() {{
+            const blob = new Blob([html], {{ type: "text/html;charset=utf-8" }});
+            const url = URL.createObjectURL(blob);
+            const opened = window.open(url, "_blank", "noopener,noreferrer");
+            if (!opened) {{
+                btn.innerText = "Allow pop-ups and click again";
+                setTimeout(() => {{
+                    btn.innerText = "Open HTML";
+                }}, 2500);
+            }}
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+        }};
+    </script>
+    """
+    components.html(open_html, height=48)
+
+
+def render_inline_html(html: str, height: int, scrolling: bool = True):
+    """Render inline HTML in a script-capable iframe."""
+    import streamlit.components.v1 as components
+
+    components.html(html, height=height, scrolling=scrolling)
+
+
+def render_copy_markdown_button(report_content: str):
+    """Render the report Markdown copy button."""
+    import json
+
+    # ensure_ascii=False keeps Chinese characters readable, escaping for JS script block
+    safe_content = json.dumps(report_content, ensure_ascii=False)
+    # Avoid closing script tag prematurely if the content happens to contain </script>
+    safe_content = safe_content.replace("</script>", "<\\/script>")
+
+    copy_html = f"""
+    <style>
+    body {{ margin: 0; padding: 0; background: transparent; overflow: hidden; }}
+    .report-copy-btn {{
+        width: 100%;
+        background: transparent;
+        border: 1px solid rgba(0, 255, 136, 0.3);
+        color: #00ff88;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.7rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        display: block;
+        box-sizing: border-box;
+    }}
+    .report-copy-btn:hover {{
+        background: rgba(0, 255, 136, 0.1);
+        border-color: #00ff88;
+    }}
+    .report-copy-btn:active {{
+        transform: scale(0.98);
+    }}
+    </style>
+    <button id="copy-btn" class="report-copy-btn">COPY MARKDOWN</button>
+    <script>
+        const content = {safe_content};
+        const btn = document.getElementById("copy-btn");
+        btn.onclick = function() {{
+            navigator.clipboard.writeText(content).then(() => {{
+                btn.innerText = "COPIED!";
+                btn.style.background = "#00ff88";
+                btn.style.color = "#000";
+                setTimeout(() => {{
+                    btn.innerText = "COPY MARKDOWN";
+                    btn.style.background = "transparent";
+                    btn.style.color = "#00ff88";
+                }}, 2000);
+            }}).catch(err => {{
+                // Fallback
+                const textArea = document.createElement("textarea");
+                textArea.value = content;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {{
+                    document.execCommand("copy");
+                    btn.innerText = "COPIED!";
+                    btn.style.background = "#00ff88";
+                    btn.style.color = "#000";
+                    setTimeout(() => {{
+                        btn.innerText = "COPY MARKDOWN";
+                        btn.style.background = "transparent";
+                        btn.style.color = "#00ff88";
+                    }}, 2000);
+                }} catch(e) {{
+                    btn.innerText = "ERROR";
+                }}
+                document.body.removeChild(textArea);
+            }});
+        }};
+    </script>
+    """
+    if hasattr(st, "html"):
+        st.html(copy_html)
+    else:
+        import streamlit.components.v1 as components
+        components.html(copy_html, height=45)
 
 
 def render_report_with_nav(
     report_content: str,
     id_prefix: str = "report",
     export_metadata: dict[str, str] | None = None,
+    show_copy_button: bool = True,
 ):
     """Render report with a navigation sidebar in the left column."""
     if not report_content:
@@ -626,122 +756,26 @@ def render_report_with_nav(
             nav_html += '</div>'
             st.markdown(nav_html, unsafe_allow_html=True)
 
-        # Copy Button via inline iframe
-        import json
+        if show_copy_button:
+            render_copy_markdown_button(report_content)
 
-        # ensure_ascii=False keeps Chinese characters readable, escaping for JS script block
-        safe_content = json.dumps(report_content, ensure_ascii=False)
-        # Avoid closing script tag prematurely if the content happens to contain </script>
-        safe_content = safe_content.replace("</script>", "<\\/script>")
-
-        copy_html = f"""
-        <style>
-        body {{ margin: 0; padding: 0; background: transparent; overflow: hidden; }}
-        .report-copy-btn {{
-            width: 100%;
-            background: transparent;
-            border: 1px solid rgba(0, 255, 136, 0.3);
-            color: #00ff88;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.7rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            display: block;
-            box-sizing: border-box;
-        }}
-        .report-copy-btn:hover {{
-            background: rgba(0, 255, 136, 0.1);
-            border-color: #00ff88;
-        }}
-        .report-copy-btn:active {{
-            transform: scale(0.98);
-        }}
-        </style>
-        <button id="copy-btn" class="report-copy-btn">COPY MARKDOWN</button>
-        <script>
-            const content = {safe_content};
-            const btn = document.getElementById("copy-btn");
-            btn.onclick = function() {{
-                navigator.clipboard.writeText(content).then(() => {{
-                    btn.innerText = "COPIED!";
-                    btn.style.background = "#00ff88";
-                    btn.style.color = "#000";
-                    setTimeout(() => {{
-                        btn.innerText = "COPY MARKDOWN";
-                        btn.style.background = "transparent";
-                        btn.style.color = "#00ff88";
-                    }}, 2000);
-                }}).catch(err => {{
-                    // Fallback
-                    const textArea = document.createElement("textarea");
-                    textArea.value = content;
-                    document.body.appendChild(textArea);
-                    textArea.select();
-                    try {{
-                        document.execCommand("copy");
-                        btn.innerText = "COPIED!";
-                        btn.style.background = "#00ff88";
-                        btn.style.color = "#000";
-                        setTimeout(() => {{
-                            btn.innerText = "COPY MARKDOWN";
-                            btn.style.background = "transparent";
-                            btn.style.color = "#00ff88";
-                        }}, 2000);
-                    }} catch(e) {{
-                        btn.innerText = "ERROR";
-                    }}
-                    document.body.removeChild(textArea);
-                }});
-            }};
-        </script>
-        """
-        if hasattr(st, "html"):
-            st.html(copy_html)
-        else:
-            import streamlit.components.v1 as components
-            components.html(copy_html, height=45)
-
-        generated_key = f"{id_prefix}_generated_html"
-        filename_key = f"{id_prefix}_generated_html_filename"
-        error_key = f"{id_prefix}_generated_html_error"
-        if st.button(
-            "Generate HTML",
-            key=f"{id_prefix}_generate_html",
-            use_container_width=True,
-            help=(
-                "Deterministic Markdown-to-HTML export. It does not call an LLM or spend tokens. "
-                "It only converts the existing Markdown report."
-            ),
-        ):
-            st.session_state.pop(generated_key, None)
-            st.session_state.pop(filename_key, None)
-            st.session_state.pop(error_key, None)
+        export_ready = id_prefix != "live" or st.session_state.get("analysis_done", False)
+        if export_ready:
             try:
-                html_report, html_filename = generate_html_report(
-                    report_content,
-                    export_metadata or current_report_export_meta(),
+                metadata = export_metadata or current_report_export_meta()
+                metadata_items = tuple(sorted((str(k), str(v)) for k, v in metadata.items()))
+                metadata_items = (("__theme_version", HTML_REPORT_THEME_VERSION), *metadata_items)
+                with st.spinner("Preparing HTML..."):
+                    html_report, _html_filename = cached_generate_html_report(report_content, metadata_items)
+                render_open_html_button(
+                    html_report,
+                    key=f"{id_prefix}-open-html-btn",
                 )
-                st.session_state[generated_key] = html_report
-                st.session_state[filename_key] = html_filename
+                st.caption("HTML export is no-token and does not call a model.")
             except Exception as exc:
-                st.session_state[error_key] = str(exc)
-
-        if st.session_state.get(error_key):
-            st.error(st.session_state[error_key])
-        st.caption("HTML export is no-token and does not call a model.")
-        if st.session_state.get(generated_key):
-            st.download_button(
-                "Download HTML",
-                data=st.session_state[generated_key],
-                file_name=st.session_state.get(filename_key, "tradingagents_report.html"),
-                mime="text/html",
-                key=f"{id_prefix}_download_html",
-                use_container_width=True,
-            )
+                st.error(str(exc))
+        else:
+            st.caption("HTML export is available after the report is complete.")
 
     with col_content, st.container(height=800, border=False):
         st.markdown('<div class="report-section">', unsafe_allow_html=True)
@@ -1085,23 +1119,53 @@ def browse_reports_ui():
     labels = [str(item["label"]) for item in entries]
     label_to_path: dict[str, Path] = {str(item["label"]): Path(str(item["report_path"])) for item in entries}
 
-    selected = st.selectbox(
-        "Select a report",
-        labels,
-        index=0,
-        label_visibility="collapsed",
-    )
+    select_col, view_col, copy_col = st.columns([5, 2, 5], gap="medium", vertical_alignment="center")
+    with select_col:
+        selected = st.selectbox(
+            "Select a report",
+            labels,
+            index=0,
+            label_visibility="collapsed",
+        )
 
     if selected:
         rf = label_to_path[selected]
         if rf.exists():
             content = rf.read_text(encoding="utf-8")
-            st.markdown("---")
-            render_report_with_nav(
-                content,
-                id_prefix="browse",
-                export_metadata=report_export_meta_from_path(rf),
-            )
+            metadata = report_export_meta_from_path(rf)
+            with view_col:
+                view_mode = st.radio(
+                    "Report view",
+                    ["HTML", "Markdown"],
+                    horizontal=True,
+                    label_visibility="collapsed",
+                    key="browse_report_view_mode",
+                )
+            with copy_col:
+                render_copy_markdown_button(content)
+            if view_mode == "HTML":
+                try:
+                    metadata_items = tuple(sorted((str(k), str(v)) for k, v in metadata.items()))
+                    metadata_items = (("__theme_version", HTML_REPORT_THEME_VERSION), *metadata_items)
+                    with st.spinner("Rendering HTML report..."):
+                        html_report, _html_filename = cached_generate_html_report(content, metadata_items)
+                    render_inline_html(html_report, height=1100, scrolling=True)
+                except Exception as exc:
+                    st.error(str(exc))
+                    st.caption("Showing Markdown fallback.")
+                    render_report_with_nav(
+                        content,
+                        id_prefix="browse",
+                        export_metadata=metadata,
+                        show_copy_button=False,
+                    )
+            else:
+                render_report_with_nav(
+                    content,
+                    id_prefix="browse",
+                    export_metadata=metadata,
+                    show_copy_button=False,
+                )
             st.markdown("---")
             st.caption(f"Path: `{rf}`")
 
