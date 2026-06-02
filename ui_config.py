@@ -25,16 +25,16 @@ PROVIDERS = [
     ("TradingAgents · xAI", "xai"),
     ("TradingAgents · DeepSeek", "deepseek"),
     ("TradingAgents · Qwen", "qwen"),
+    ("TradingAgents · Qwen (CN)", "qwen-cn"),
     ("TradingAgents · GLM", "glm"),
+    ("TradingAgents · GLM (CN)", "glm-cn"),
     ("TradingAgents · OpenRouter", "openrouter"),
     ("TradingAgents · Azure OpenAI", "azure"),
     ("TradingAgents · Ollama", "ollama"),
-    ("Custom · GLM Coding Plan (CN)", "glm_cn"),
-    ("Custom · GLM Coding Plan (Global)", "glm_global"),
+    ("TradingAgents · MiniMax", "minimax"),
+    ("TradingAgents · MiniMax (CN)", "minimax-cn"),
     ("Custom · Kimi Coding Plan", "kimi"),
     ("Custom · Moonshot", "moonshot"),
-    ("Custom · MiniMax Token Plan (CN)", "minimax_cn"),
-    ("Custom · MiniMax Token Plan (Global)", "minimax_global"),
     ("Custom · DeepSeek Anthropic API", "deepseek_anthropic"),
     ("Custom · Volcengine Ark Coding", "volcengine"),
     ("Custom · Xiaomi MiMo", "mimo"),
@@ -51,15 +51,15 @@ PROVIDER_URLS = {
     "anthropic": "https://api.anthropic.com/", "xai": "https://api.x.ai/v1",
     "deepseek": "https://api.deepseek.com",
     "qwen": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    "qwen-cn": "https://dashscope.aliyuncs.com/compatible-mode/v1",
     "glm": "https://api.z.ai/api/paas/v4/",
+    "glm-cn": "https://open.bigmodel.cn/api/paas/v4/",
     "openrouter": "https://openrouter.ai/api/v1",
     "azure": None, "ollama": "http://localhost:11434/v1",
-    "glm_cn": "https://open.bigmodel.cn/api/anthropic",
-    "glm_global": "https://api.z.ai/api/anthropic",
+    "minimax": "https://api.minimax.io/v1",
+    "minimax-cn": "https://api.minimaxi.com/v1",
     "kimi": "https://api.kimi.com/coding/",
     "moonshot": "https://api.moonshot.cn/anthropic",
-    "minimax_cn": "https://api.minimaxi.com/anthropic",
-    "minimax_global": "https://api.minimax.io/anthropic",
     "deepseek_anthropic": "https://api.deepseek.com/anthropic",
     "volcengine": "https://ark.cn-beijing.volces.com/api/coding",
     "mimo": "https://api.xiaomimimo.com/anthropic",
@@ -78,15 +78,15 @@ PROVIDER_API_KEY_ENV = {
     "xai": "XAI_API_KEY",
     "deepseek": "DEEPSEEK_API_KEY",
     "qwen": "DASHSCOPE_API_KEY",
+    "qwen-cn": "DASHSCOPE_CN_API_KEY",
     "glm": "ZHIPU_API_KEY",
+    "glm-cn": "ZHIPU_CN_API_KEY",
     "openrouter": "OPENROUTER_API_KEY",
     "azure": "AZURE_OPENAI_API_KEY",
-    "glm_cn": "GLM_CN_API_KEY",
-    "glm_global": "GLM_GLOBAL_API_KEY",
+    "minimax": "MINIMAX_API_KEY",
+    "minimax-cn": "MINIMAX_CN_API_KEY",
     "kimi": "KIMI_API_KEY",
     "moonshot": "MOONSHOT_API_KEY",
-    "minimax_cn": "MINIMAX_CN_API_KEY",
-    "minimax_global": "MINIMAX_GLOBAL_API_KEY",
     "deepseek_anthropic": "DEEPSEEK_ANTHROPIC_API_KEY",
     "volcengine": "ARK_API_KEY",
     "mimo": "MIMO_API_KEY",
@@ -105,12 +105,8 @@ AZURE_ENV_FIELDS = (
 )
 
 PROVIDER_BASE_URL_ENV = {
-    "glm_cn": "GLM_CN_BASE_URL",
-    "glm_global": "GLM_GLOBAL_BASE_URL",
     "kimi": "KIMI_BASE_URL",
     "moonshot": "MOONSHOT_BASE_URL",
-    "minimax_cn": "MINIMAX_CN_BASE_URL",
-    "minimax_global": "MINIMAX_GLOBAL_BASE_URL",
     "deepseek_anthropic": "DEEPSEEK_ANTHROPIC_BASE_URL",
     "volcengine": "ARK_BASE_URL",
     "mimo": "MIMO_BASE_URL",
@@ -123,12 +119,8 @@ PROVIDER_BASE_URL_ENV = {
 }
 
 PROVIDER_RUNTIME = {
-    "glm_cn": "anthropic",
-    "glm_global": "anthropic",
     "kimi": "anthropic",
     "moonshot": "anthropic",
-    "minimax_cn": "anthropic",
-    "minimax_global": "anthropic",
     "deepseek_anthropic": "anthropic",
     "volcengine": "anthropic",
     "mimo": "anthropic",
@@ -143,14 +135,6 @@ PROVIDER_RUNTIME = {
 OPTIONAL_API_KEY_PROVIDERS = {"ollama", "ollama_anthropic", "litellm"}
 
 PROVIDER_MODEL_OPTIONS = {
-    "glm_cn": {
-        "quick": [("GLM-4.5-Air", "glm-4.5-air"), ("GLM-5-Turbo", "glm-5-turbo"), ("Custom model ID", "custom")],
-        "deep": [("GLM-5.1", "glm-5.1"), ("GLM-5-Turbo", "glm-5-turbo"), ("Custom model ID", "custom")],
-    },
-    "glm_global": {
-        "quick": [("GLM-4.5-Air", "glm-4.5-air"), ("GLM-5-Turbo", "glm-5-turbo"), ("Custom model ID", "custom")],
-        "deep": [("GLM-5.1", "glm-5.1"), ("GLM-5-Turbo", "glm-5-turbo"), ("Custom model ID", "custom")],
-    },
     "kimi": {
         "quick": [("Kimi K2.5", "sonnet"), ("Custom model ID", "custom")],
         "deep": [("Kimi K2.5", "sonnet"), ("Custom model ID", "custom")],
@@ -158,14 +142,6 @@ PROVIDER_MODEL_OPTIONS = {
     "moonshot": {
         "quick": [("Kimi K2.5", "sonnet"), ("Custom model ID", "custom")],
         "deep": [("Kimi K2.5", "sonnet"), ("Custom model ID", "custom")],
-    },
-    "minimax_cn": {
-        "quick": [("MiniMax-M2.7", "MiniMax-M2.7"), ("Custom model ID", "custom")],
-        "deep": [("MiniMax-M2.7", "MiniMax-M2.7"), ("Custom model ID", "custom")],
-    },
-    "minimax_global": {
-        "quick": [("MiniMax-M2.7", "MiniMax-M2.7"), ("Custom model ID", "custom")],
-        "deep": [("MiniMax-M2.7", "MiniMax-M2.7"), ("Custom model ID", "custom")],
     },
     "deepseek_anthropic": {
         "quick": [("DeepSeek V4 Flash", "deepseek-v4-flash"), ("DeepSeek V4 Pro", "deepseek-v4-pro"), ("Custom model ID", "custom")],
