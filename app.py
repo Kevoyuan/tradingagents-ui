@@ -741,7 +741,7 @@ def render_open_html_button(html_report: str, key: str):
         width: 100%;
         background: transparent;
         border: 1px solid rgba(255, 255, 255, 0.22);
-        color: #f5f5f5;
+        color: var(--color-ink-primary);
         padding: 10px 12px;
         border-radius: 6px;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -753,9 +753,9 @@ def render_open_html_button(html_report: str, key: str):
         box-sizing: border-box;
     }}
     .open-html-btn:hover {{
-        border-color: rgba(0, 255, 136, 0.65);
-        color: #00ff88;
-        background: rgba(0, 255, 136, 0.08);
+        border-color: rgba(var(--color-accent-rgb), 0.65);
+        color: var(--color-accent);
+        background: rgba(var(--color-accent-rgb), 0.08);
     }}
     .open-html-btn:active {{ transform: scale(0.99); }}
     </style>
@@ -802,8 +802,8 @@ def render_copy_markdown_button(report_content: str):
     .report-copy-btn {{
         width: 100%;
         background: transparent;
-        border: 1px solid rgba(0, 255, 136, 0.3);
-        color: #00ff88;
+        border: 1px solid rgba(var(--color-accent-rgb), 0.3);
+        color: var(--color-accent);
         padding: 8px 12px;
         border-radius: 6px;
         font-family: 'JetBrains Mono', monospace;
@@ -816,8 +816,8 @@ def render_copy_markdown_button(report_content: str):
         box-sizing: border-box;
     }}
     .report-copy-btn:hover {{
-        background: rgba(0, 255, 136, 0.1);
-        border-color: #00ff88;
+        background: rgba(var(--color-accent-rgb), 0.1);
+        border-color: var(--color-accent);
     }}
     .report-copy-btn:active {{
         transform: scale(0.98);
@@ -830,12 +830,12 @@ def render_copy_markdown_button(report_content: str):
         btn.onclick = function() {{
             navigator.clipboard.writeText(content).then(() => {{
                 btn.innerText = "COPIED!";
-                btn.style.background = "#00ff88";
-                btn.style.color = "#000";
+                btn.style.background = "var(--color-accent)";
+                btn.style.color = "var(--color-on-accent)";
                 setTimeout(() => {{
                     btn.innerText = "COPY MARKDOWN";
                     btn.style.background = "transparent";
-                    btn.style.color = "#00ff88";
+                    btn.style.color = "var(--color-accent)";
                 }}, 2000);
             }}).catch(err => {{
                 // Fallback
@@ -846,12 +846,12 @@ def render_copy_markdown_button(report_content: str):
                 try {{
                     document.execCommand("copy");
                     btn.innerText = "COPIED!";
-                    btn.style.background = "#00ff88";
-                    btn.style.color = "#000";
+                    btn.style.background = "var(--color-accent)";
+                    btn.style.color = "var(--color-on-accent)";
                     setTimeout(() => {{
                         btn.innerText = "COPY MARKDOWN";
                         btn.style.background = "transparent";
-                        btn.style.color = "#00ff88";
+                        btn.style.color = "var(--color-accent)";
                     }}, 2000);
                 }} catch(e) {{
                     btn.innerText = "ERROR";
@@ -1345,9 +1345,9 @@ def render_sidebar_brand():
     brand_html = (
         '<div style="padding:0.5rem 0 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);'
         ' margin-bottom: 1.5rem;">'
-        '<div style="font-size:2.2rem;font-weight:800;color:#00ff88;letter-spacing:-0.03em;'
+        '<div style="font-size:2.2rem;font-weight:800;color:var(--color-accent);letter-spacing:-0.03em;'
         'line-height:1.1;text-shadow: 0 0 12px rgba(0,255,136,0.4);">TradingAgents</div>'
-        '<div style="font-size:0.75rem;color:#8b949e;font-family:\'JetBrains Mono\',monospace;'
+        '<div style="font-size:0.75rem;color:var(--color-ink-faint);font-family:\'JetBrains Mono\',monospace;'
         'opacity:0.8;margin-top:0.6rem;letter-spacing:0.05em;">'
         'v1.2.0 &middot; INDUSTRIAL CONTROL PANEL</div></div>'
     )
