@@ -6,7 +6,15 @@
 
 ![Embedded HTML report](images/trade-ui-embedded-html-report.png)
 
-## 一键启动
+## 启动方式
+
+只有一个 Streamlit 应用入口：`app.py`。
+
+本地日常使用请通过 `trade-ui` 或仓库自带脚本启动。这些启动器会设置本地模式（`TRADINGAGENTS_UI_LOCAL=1`），因此 API Key 可以保存在这台电脑上，然后再启动 `app.py` 的 Streamlit 服务。
+
+macOS 和 Windows 启动器会先寻找已经能导入 Streamlit 的 Python 环境。如果找不到，会用 `uv` 自动创建 `.venv` 并安装本项目依赖。
+
+也可以直接运行 `streamlit run app.py`。这个方式用于 Streamlit Community Cloud 或高级调试；默认不会把 API Key 保存到本机，除非你自己显式开启本地模式。
 
 ### macOS
 
@@ -42,31 +50,68 @@ http://localhost:8501
 
 想更像桌面应用，可以给这个 `.bat` 创建桌面快捷方式。
 
-### 所有系统通用
+### 终端启动
 
 ```bash
 trade-ui
 ```
 
-本地开发 checkout 也可以：
+本地开发 checkout 可以用等价脚本：
 
 ```bash
 ./run.sh
 ```
 
+这两个命令都会开启本地模式，并打开同一个 `http://localhost:8501` UI。
+
+### 直接 Streamlit
+
+云端部署或高级调试时使用：
+
+```bash
+streamlit run app.py
+```
+
+直接 Streamlit 模式下，API Key 只保留在当前会话里。如果你确实想绕过启动器但仍保存本机 API Key，可以这样启动：
+
+```text
+# macOS/Linux
+TRADINGAGENTS_UI_LOCAL=1 streamlit run app.py
+
+# Windows PowerShell
+$env:TRADINGAGENTS_UI_LOCAL="1"; streamlit run app.py
+```
+
 ## 第一次安装
+
+如果希望桌面启动器自动准备 Python 环境，先安装一次 `uv`：
+
+```text
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows PowerShell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
 
 ```bash
 git clone https://github.com/Kevoyuan/tradingagents-ui.git
 cd tradingagents-ui
-python3 -m pip install -e .
 ```
 
 然后按你的系统选择启动方式：
 
 - macOS：运行 `./scripts/install-macos-app.sh`，以后双击 `TradingAgents UI.app`
 - Windows：双击 `scripts\launch-local-webapp.bat`
-- Linux/其他：运行 `trade-ui`
+- 任意系统终端：运行 `trade-ui`
+- 本地开发 checkout：运行 `./run.sh`
+
+终端开发时，也可以手动创建同样的环境：
+
+```bash
+uv venv --python 3.11
+uv pip install -e .
+```
 
 ## 使用流程
 
@@ -81,6 +126,8 @@ API Key 会保存在本机，下次打开自动加载。云端部署时不会保
 ## 内置 TradingAgents 更新检查
 
 软件打开时会在后台静默检查一次 GitHub。
+
+启动命令不会在打开 UI 前更新 TradingAgents。更新统一在 UI 内处理，这样所有本地启动器行为一致。
 
 如果发现 TradingAgents 有更新，左上角侧边栏的 **TradingAgents** LOGO 旁边会出现一个更新图标。没有更新时，这个图标不会出现。
 
@@ -141,6 +188,7 @@ http://192.168.1.23:8501
 Cloud 注意事项：
 
 - 每个用户在侧边栏输入自己的 API Key
+- 云端直接运行 `app.py`，不要使用本地 `trade-ui` 启动器
 - Cloud 报告保存在云端容器内，适合临时查看
 - Ollama、localhost LiteLLM 这类本地服务不能直接被云端访问
 
@@ -175,11 +223,21 @@ Cloud 注意事项：
 
 ## 开发者说明
 
-UI 入口优先级：
+UI 入口始终是 `app.py`。
+
+本地启动器包括 `trade-ui`、`python -m trade_ui.cli`、`./run.sh`、`./run-lan.sh` 以及 macOS/Windows 启动脚本。它们会解析 app 路径，设置 `TRADINGAGENTS_UI_LOCAL=1`，然后执行 Streamlit。
+
+macOS 和 Windows 启动脚本会优先使用 `.venv`，再寻找其他能导入 Streamlit 的 Python。如果都不可用且已经安装 `uv`，它们会自动执行 `uv venv --python 3.11 .venv` 和 `uv pip install -e .`。可以用 `TRADINGAGENTS_UI_PYTHON_VERSION` 覆盖默认 Python 版本。
+
+本地启动器的 app 路径优先级：
 
 1. `TRADINGAGENTS_UI_APP_PATH`
 2. 当前目录下的 `./app.py`
 3. 已安装包里的 fallback `app.py`
+
+直接 `streamlit run app.py` 会绕过启动器。它适合 Streamlit Cloud 和调试，但除非设置 `TRADINGAGENTS_UI_LOCAL=1`，否则 API Key 只在会话内保存。
+
+TradingAgents 更新检查在 `app.py` 里，由侧边栏更新图标触发。CLI 启动时不会安装或更新 TradingAgents。
 
 如果你在开发本地 TradingAgents checkout：
 

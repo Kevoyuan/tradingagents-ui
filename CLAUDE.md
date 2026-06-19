@@ -13,7 +13,8 @@ Single Streamlit entrypoint: `app.py` (1.6k lines). The package adds a CLI wrapp
 Install (editable, into the active venv):
 
 ```bash
-python3 -m pip install -e .
+uv venv --python 3.11
+uv pip install -e .
 ```
 
 Run the UI (this is what the `.app` and `.bat` launchers call):
@@ -23,7 +24,12 @@ Run the UI (this is what the `.app` and `.bat` launchers call):
 ./run-lan.sh            # bind 0.0.0.0 for phone access
 trade-ui --lan          # equivalent via installed console_script
 trade-ui --port 9000    # custom port (passed through to streamlit)
-trade-ui --no-update    # skip the TradingAgents git update check
+```
+
+Direct Streamlit is supported for cloud/deep debugging, but it bypasses the local wrapper and leaves API keys session-only unless `TRADINGAGENTS_UI_LOCAL=1` is set:
+
+```bash
+streamlit run app.py
 ```
 
 Run tests:
@@ -55,7 +61,7 @@ ui_panels.py            HTML render helpers for the live agent progress and mess
 ui_styles.py            One big CUSTOM_CSS string injected via st.markdown
 preferences.py          JSON-backed user prefs at ~/.tradingagents/ui_preferences.json
                         plus ~/.tradingagents/.env for API keys (local mode only)
-trade_ui/cli.py         Console-script wrapper: update TradingAgents then exec streamlit
+trade_ui/cli.py         Console-script wrapper: set local mode then exec streamlit
 scripts/                One-click launchers (install-macos-app.sh, launch-local-webapp.sh/bat)
 tools/baoyu-markdown-to-html/  Vendored Bun/TS markdown→HTML converter (Quant Terminal theme)
 tests/                  pytest suite for the pure helpers in app.py and trade_ui/cli.py
@@ -78,11 +84,13 @@ tests/                  pytest suite for the pure helpers in app.py and trade_ui
 
 `cached_tradingagents_update_status` (`app.py:145`) is `@st.cache_data(ttl=3600)`. It does a `git ls-remote --tags` against `TauricResearch/TradingAgents` and compares to either a local checkout (when `TRADINGAGENTS_DIR` is set) or the installed pip package version. The sidebar brand renders an `↥` button when an update is available; clicking it calls `update_tradingagents_from_app` which shells out to `git pull` + `pip install -e .` (or `pip install -U git+https://...` when no local checkout).
 
+The CLI does not install or update TradingAgents during startup. The deprecated `--no-update` flag is accepted only so old launchers do not fail.
+
 ### Environment variables
 
 - `TRADINGAGENTS_UI_LOCAL=1` — set by `trade_ui/cli.py`. When set, API keys are persisted to disk. Unset in Streamlit Cloud.
 - `TRADINGAGENTS_UI_APP_PATH` — override which `app.py` to run (1st priority in `_resolve_app_path`).
-- `TRADINGAGENTS_UI_NO_UPDATE=1` — skip the TradingAgents update check on launch.
+- `TRADINGAGENTS_UI_PYTHON_VERSION` — Python version used by desktop launchers when bootstrapping `.venv` with `uv` (default: `3.11`).
 - `TRADINGAGENTS_DIR` — path to a local TradingAgents checkout. If set, updates are done via `git pull` + `pip install -e .` instead of reinstalling the git URL.
 - `TRADINGAGENTS_UI_PORT` / `TRADINGAGENTS_UI_HOST` — read by the macOS/Windows launcher scripts only.
 

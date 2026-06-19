@@ -1,7 +1,13 @@
 #!/bin/bash
 # Launch TradingAgents UI for devices on the same local network.
-set -e
-cd "$(dirname "$0")"
+set -euo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PYTHON_VERSION="${TRADINGAGENTS_UI_PYTHON_VERSION:-3.11}"
+LOG_FILE="${TRADINGAGENTS_UI_LOG_FILE:-/dev/stderr}"
+source "${PROJECT_DIR}/scripts/python-env.sh"
 
 echo ""
-exec "${PYTHON:-python3}" -m trade_ui.cli --lan "$@"
+cd "${PROJECT_DIR}"
+PYTHON_BIN="$(resolve_tradingagents_ui_python)"
+exec "${PYTHON_BIN}" -m trade_ui.cli --lan "$@"

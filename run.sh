@@ -1,7 +1,13 @@
 #!/bin/bash
-# Run TradingAgents UI through the CLI wrapper so update checks stay consistent.
-set -e
-cd "$(dirname "$0")"
+# Run TradingAgents UI through the local launcher wrapper.
+set -euo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PYTHON_VERSION="${TRADINGAGENTS_UI_PYTHON_VERSION:-3.11}"
+LOG_FILE="${TRADINGAGENTS_UI_LOG_FILE:-/dev/stderr}"
+source "${PROJECT_DIR}/scripts/python-env.sh"
 
 echo ""
-exec "${PYTHON:-python3}" -m trade_ui.cli "$@"
+cd "${PROJECT_DIR}"
+PYTHON_BIN="$(resolve_tradingagents_ui_python)"
+exec "${PYTHON_BIN}" -m trade_ui.cli "$@"

@@ -5,12 +5,14 @@ set -euo pipefail
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PORT="${TRADINGAGENTS_UI_PORT:-8501}"
 HOST="${TRADINGAGENTS_UI_HOST:-localhost}"
+PYTHON_VERSION="${TRADINGAGENTS_UI_PYTHON_VERSION:-3.11}"
 URL="http://${HOST}:${PORT}"
 LOG_DIR="${HOME}/Library/Logs/tradingagents-ui"
 PID_FILE="${LOG_DIR}/streamlit.pid"
 LOG_FILE="${LOG_DIR}/streamlit.log"
 
 mkdir -p "${LOG_DIR}"
+source "${PROJECT_DIR}/scripts/python-env.sh"
 
 port_is_listening() {
   lsof -nP -iTCP:"${PORT}" -sTCP:LISTEN >/dev/null 2>&1
@@ -22,8 +24,10 @@ server_is_healthy() {
 
 if ! port_is_listening; then
   cd "${PROJECT_DIR}"
-  TRADINGAGENTS_UI_NO_UPDATE=1 nohup "${PYTHON:-python3}" -m trade_ui.cli --no-update --port "${PORT}" \
-    >"${LOG_FILE}" 2>&1 &
+  : >"${LOG_FILE}"
+  PYTHON_BIN="$(resolve_tradingagents_ui_python)"
+  nohup "${PYTHON_BIN}" -m trade_ui.cli --port "${PORT}" \
+    >>"${LOG_FILE}" 2>&1 &
   echo "$!" >"${PID_FILE}"
 fi
 

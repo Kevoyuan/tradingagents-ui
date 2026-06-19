@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import datetime
 import html as html_lib
 import importlib.metadata
@@ -412,7 +413,11 @@ def save_current_config():
         "quick_think_llm": st.session_state.get("quick_model", ""),
         "deep_think_llm": st.session_state.get("deep_model", ""),
         "provider_model_profiles": st.session_state.get("provider_model_profiles", {}),
-        **({"api_key_profiles": st.session_state.get("api_key_profiles", {})} if is_local_persistence_enabled() else {}),
+        **(
+            {"api_key_profiles": st.session_state.get("api_key_profiles", {})}
+            if is_local_persistence_enabled()
+            else {}
+        ),
     })
     if is_local_persistence_enabled():
         save_api_env_file(get_all_api_env_values())
@@ -448,10 +453,8 @@ def save_api_env_file(env_values: dict[str, str]):
     """Persist local credentials to ~/.tradingagents/.env."""
     PREFS_DIR.mkdir(parents=True, exist_ok=True)
     USER_ENV_FILE.touch(exist_ok=True)
-    try:
+    with contextlib.suppress(OSError):
         os.chmod(USER_ENV_FILE, 0o600)
-    except OSError:
-        pass
 
     existing_values = dotenv_values(USER_ENV_FILE)
     for env_name in MANAGED_ENV_NAMES:
@@ -802,8 +805,8 @@ def render_copy_markdown_button(report_content: str):
     .report-copy-btn {{
         width: 100%;
         background: transparent;
-        border: 1px solid rgba(var(--color-accent-rgb), 0.3);
-        color: var(--color-accent);
+        border: 1px solid rgba(var(--color-accent-rgb, 52, 255, 132), 0.35);
+        color: var(--color-accent, #34ff84);
         padding: 8px 12px;
         border-radius: 6px;
         font-family: 'JetBrains Mono', monospace;
@@ -816,8 +819,8 @@ def render_copy_markdown_button(report_content: str):
         box-sizing: border-box;
     }}
     .report-copy-btn:hover {{
-        background: rgba(var(--color-accent-rgb), 0.1);
-        border-color: var(--color-accent);
+        background: rgba(var(--color-accent-rgb, 52, 255, 132), 0.1);
+        border-color: var(--color-accent, #34ff84);
     }}
     .report-copy-btn:active {{
         transform: scale(0.98);
@@ -830,28 +833,34 @@ def render_copy_markdown_button(report_content: str):
         btn.onclick = function() {{
             navigator.clipboard.writeText(content).then(() => {{
                 btn.innerText = "COPIED!";
-                btn.style.background = "var(--color-accent)";
-                btn.style.color = "var(--color-on-accent)";
+                btn.style.background = "var(--color-accent, #34ff84)";
+                btn.style.color = "var(--color-on-accent, #06110b)";
                 setTimeout(() => {{
                     btn.innerText = "COPY MARKDOWN";
                     btn.style.background = "transparent";
-                    btn.style.color = "var(--color-accent)";
+                    btn.style.color = "var(--color-accent, #34ff84)";
                 }}, 2000);
             }}).catch(err => {{
                 // Fallback
                 const textArea = document.createElement("textarea");
                 textArea.value = content;
+                textArea.setAttribute("readonly", "");
+                textArea.style.position = "fixed";
+                textArea.style.top = "0";
+                textArea.style.left = "0";
+                textArea.style.opacity = "0";
                 document.body.appendChild(textArea);
+                textArea.focus();
                 textArea.select();
                 try {{
                     document.execCommand("copy");
                     btn.innerText = "COPIED!";
-                    btn.style.background = "var(--color-accent)";
-                    btn.style.color = "var(--color-on-accent)";
+                    btn.style.background = "var(--color-accent, #34ff84)";
+                    btn.style.color = "var(--color-on-accent, #06110b)";
                     setTimeout(() => {{
                         btn.innerText = "COPY MARKDOWN";
                         btn.style.background = "transparent";
-                        btn.style.color = "var(--color-accent)";
+                        btn.style.color = "var(--color-accent, #34ff84)";
                     }}, 2000);
                 }} catch(e) {{
                     btn.innerText = "ERROR";
@@ -861,11 +870,9 @@ def render_copy_markdown_button(report_content: str):
         }};
     </script>
     """
-    if hasattr(st, "html"):
-        st.html(copy_html)
-    else:
-        import streamlit.components.v1 as components
-        components.html(copy_html, height=45)
+    import streamlit.components.v1 as components
+
+    components.html(copy_html, height=45)
 
 
 def render_report_with_nav(
