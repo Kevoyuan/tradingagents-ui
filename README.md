@@ -40,6 +40,24 @@ Double-click `scripts\launch-local-webapp.bat`. The launcher creates the local e
 
 The live view shows agent progress, tool calls and report sections. Completed reports remain available under **Browse Reports**.
 
+## Screenshots
+
+### Embedded HTML Report
+
+![Embedded HTML report](images/trade-ui-embedded-html-report.png)
+
+### Report Viewer
+
+![Report viewer](images/trade-ui-report-viewer.png)
+
+### Report History
+
+![Report history](images/trade-ui-history-reports.png)
+
+### Provider Configuration
+
+![Provider configuration](images/trade-ui-providers.png)
+
 ## Core Features
 
 - Live multi-agent analysis progress

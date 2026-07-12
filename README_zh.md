@@ -40,6 +40,24 @@ open "TradingAgents UI.app"
 
 实时页面会显示 Agent 进度、工具调用和报告章节。完成后的报告可在 **Browse Reports** 中继续查看。
 
+## 界面截图
+
+### 内嵌 HTML 报告
+
+![内嵌 HTML 报告](images/trade-ui-embedded-html-report.png)
+
+### 报告阅读器
+
+![报告阅读器](images/trade-ui-report-viewer.png)
+
+### 历史报告
+
+![历史报告](images/trade-ui-history-reports.png)
+
+### Provider 配置
+
+![Provider 配置](images/trade-ui-providers.png)
+
 ## 核心功能
 
 - 实时多 Agent 分析进度
