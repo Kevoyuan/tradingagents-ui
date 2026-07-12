@@ -2,6 +2,8 @@
 
 一个用于运行 [TradingAgents](https://github.com/TauricResearch/TradingAgents) 分析并阅读报告的本地 Streamlit 桌面式界面。
 
+[English](README.md)
+
 **兼容 TradingAgents v0.3.1**
 
 ![TradingAgents UI 实时分析](images/trade-ui-monitor.png)

@@ -2,6 +2,8 @@
 
 A local Streamlit desktop-style interface for running [TradingAgents](https://github.com/TauricResearch/TradingAgents) analyses and reading the resulting reports.
 
+[中文说明](README_zh.md)
+
 **Compatible with TradingAgents v0.3.1**
 
 ![TradingAgents UI analysis monitor](images/trade-ui-monitor.png)
