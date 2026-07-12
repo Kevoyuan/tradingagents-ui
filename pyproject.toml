@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tradingagents-ui"
-version = "0.1.0"
+version = "1.3.0"
 description = "Lightweight Streamlit UI for TradingAgents"
 requires-python = ">=3.10"
 dependencies = [
@@ -20,7 +20,36 @@ bedrock = ["langchain-aws>=1.5.0"]
 trade-ui = "trade_ui.cli:main"
 
 [tool.setuptools]
-packages = ["trade_ui"]
+py-modules = [
+    "app",
+    "preferences",
+    "provider_migrations",
+    "reporting_adapter",
+    "runtime_environment",
+    "tradingagents_adapter",
+    "tradingagents_compat",
+    "ui_advanced",
+    "ui_config",
+    "ui_panels",
+    "ui_styles",
+]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["trade_ui*", "tools", "images"]
+
+[tool.setuptools.package-data]
+tools = [
+    "baoyu-markdown-to-html/SKILL.md",
+    "baoyu-markdown-to-html/scripts/*.ts",
+    "baoyu-markdown-to-html/scripts/*.json",
+    "baoyu-markdown-to-html/scripts/*.lock",
+    "baoyu-markdown-to-html/scripts/vendor/**",
+]
+images = ["*.png"]
+
+[tool.setuptools.exclude-package-data]
+tools = ["baoyu-markdown-to-html/scripts/node_modules/**"]
 
 [tool.ruff]
 target-version = "py310"
