@@ -31,12 +31,17 @@ except (ImportError, ModuleNotFoundError):
 
 from preferences import PREFS_DIR, load_preferences, save_preferences
 from provider_migrations import PROVIDER_SCHEMA_VERSION, migrate_provider_preferences
+from reporting_adapter import save_ui_reports
+from runtime_environment import effective_environment, temporary_environment
 from tradingagents_adapter import TradingAgentsAdapter, detect_asset_type
 from tradingagents_compat import (
+    TRADINGAGENTS_MAX_VERSION,
     TRADINGAGENTS_REPO_URL,
     TRADINGAGENTS_TARGET_TAG,
     tagged_install_requirement,
     tradingagents_compatibility,
+    ui_version,
+    version_tuple,
 )
 from ui_advanced import render_advanced_settings, render_data_vendor_settings
 from ui_config import (
@@ -86,6 +91,13 @@ HTML_REPORT_THEME_VERSION = "quant-terminal-readme-shot-v2"
 
 def is_local_persistence_enabled() -> bool:
     return os.environ.get("TRADINGAGENTS_UI_LOCAL") == "1"
+
+
+def validate_ticker_for_run(ticker: str) -> str:
+    """Return a ticker safe for every UI-created filesystem path."""
+    from tradingagents.dataflows.utils import safe_ticker_component
+
+    return safe_ticker_component(ticker)
 
 
 def find_tradingagents_checkout() -> Path | None:
@@ -156,41 +168,69 @@ def checkout_has_local_changes(repo_dir: Path) -> bool:
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def cached_tradingagents_update_status() -> dict[str, str | bool]:
-    """Check GitHub update status for TradingAgents without mutating the environment."""
+    """Offer the pinned release only when the installed version needs it."""
     checkout = find_tradingagents_checkout()
+    installed = is_tradingagents_installed()
+    installed_version = installed_tradingagents_version() if installed else "missing"
+    compatibility = tradingagents_compatibility(installed_version)
+
+    if checkout:
+        local_tag = latest_local_checkout_tag(checkout)
+        return {
+            "mode": "local checkout",
+            "path": str(checkout),
+            "installed": installed,
+            "installed_version": installed_version,
+            "local_tag": local_tag,
+            "remote_tag": TRADINGAGENTS_TARGET_TAG,
+            "dirty": checkout_has_local_changes(checkout),
+            "update_available": False,
+            "error": "",
+            "notice": (
+                f"Local TradingAgents checkout detected ({local_tag}). "
+                f"This app will not change its branch. Required compatibility: >=0.3.1,<0.4."
+            ),
+        }
+
+    if compatibility.compatible:
+        return {
+            "mode": "installed package",
+            "installed": installed,
+            "installed_version": installed_version,
+            "local_tag": "unknown",
+            "remote_tag": TRADINGAGENTS_TARGET_TAG,
+            "dirty": False,
+            "update_available": False,
+            "error": "",
+        }
+
+    if installed and version_tuple(installed_version) and version_tuple(installed_version) >= TRADINGAGENTS_MAX_VERSION:
+        return {
+            "mode": "installed package",
+            "installed": True,
+            "installed_version": installed_version,
+            "local_tag": "unknown",
+            "remote_tag": TRADINGAGENTS_TARGET_TAG,
+            "dirty": False,
+            "update_available": False,
+            "error": "",
+            "notice": compatibility.message,
+        }
+
     try:
         remote_tag = latest_remote_tradingagents_tag()
     except Exception as exc:
         return {
-            "mode": "local checkout" if checkout else "installed package",
-            "installed": is_tradingagents_installed(),
-            "installed_version": installed_tradingagents_version(),
-            "local_tag": latest_local_checkout_tag(checkout) if checkout else "unknown",
+            "mode": "installed package",
+            "installed": installed,
+            "installed_version": installed_version,
+            "local_tag": "unknown",
             "remote_tag": "unknown",
-            "dirty": checkout_has_local_changes(checkout) if checkout else False,
+            "dirty": False,
             "update_available": False,
             "error": str(exc),
         }
 
-    if checkout:
-        local_tag = latest_local_checkout_tag(checkout)
-        dirty = checkout_has_local_changes(checkout)
-        return {
-            "mode": "local checkout",
-            "path": str(checkout),
-            "installed": is_tradingagents_installed(),
-            "installed_version": installed_tradingagents_version(),
-            "local_tag": local_tag,
-            "remote_tag": remote_tag,
-            "dirty": dirty,
-            "update_available": bool(remote_tag != "unknown" and local_tag != "unknown" and remote_tag != local_tag),
-            "error": "",
-        }
-
-    installed = is_tradingagents_installed()
-    installed_version = installed_tradingagents_version() if installed else "missing"
-    normalized_installed = normalize_version_tag(installed_version)
-    normalized_remote = normalize_version_tag(remote_tag)
     return {
         "mode": "installed package",
         "installed": installed,
@@ -198,11 +238,9 @@ def cached_tradingagents_update_status() -> dict[str, str | bool]:
         "local_tag": "unknown",
         "remote_tag": remote_tag,
         "dirty": False,
-        "update_available": bool(
-            (not installed)
-            or (normalized_installed and normalized_remote and normalized_installed != normalized_remote)
-        ),
+        "update_available": remote_tag == TRADINGAGENTS_TARGET_TAG,
         "error": "",
+        "notice": compatibility.message,
     }
 
 
@@ -216,25 +254,10 @@ def update_tradingagents_from_app(status: dict[str, str | bool]) -> tuple[bool, 
     checkout_path = status.get("path")
     if checkout_path:
         repo_dir = Path(str(checkout_path))
-        if checkout_has_local_changes(repo_dir):
-            return False, f"Local TradingAgents checkout has uncommitted changes: {repo_dir}"
-        try:
-            subprocess.run(
-                [
-                    "git", "fetch", "origin",
-                    f"refs/tags/{TRADINGAGENTS_TARGET_TAG}:refs/tags/{TRADINGAGENTS_TARGET_TAG}",
-                ],
-                cwd=repo_dir, check=True, text=True, capture_output=True,
-            )
-            subprocess.run(
-                ["git", "checkout", "--detach", TRADINGAGENTS_TARGET_TAG],
-                cwd=repo_dir, check=True, text=True, capture_output=True,
-            )
-            subprocess.run([sys.executable, "-m", "pip", "install", "-e", str(repo_dir), "--quiet"], check=True)
-            return True, f"Installed TradingAgents {TRADINGAGENTS_TARGET_TAG} from local checkout: {repo_dir}"
-        except subprocess.CalledProcessError as exc:
-            detail = (exc.stderr or exc.stdout or str(exc)).strip()
-            return False, detail
+        return False, (
+            f"Local checkout left unchanged: {repo_dir}. "
+            f"Update it manually to a TradingAgents version in >=0.3.1,<0.4."
+        )
 
     try:
         subprocess.run(
@@ -551,14 +574,26 @@ def get_api_env_values(provider: str) -> dict[str, str]:
     return env_values
 
 
-def apply_api_env_values(env_values: dict[str, str], override: bool = True):
-    """Expose sidebar credentials to TradingAgents."""
-    if override:
+def get_streamlit_secret_values(secrets=None) -> dict[str, str]:
+    """Best-effort secret lookup without exposing values to logs or the UI."""
+    values: dict[str, str] = {}
+    try:
+        secrets = st.secrets if secrets is None else secrets
         for env_name in MANAGED_ENV_NAMES:
-            os.environ.pop(env_name, None)
-    for env_name, value in env_values.items():
-        if value and (override or not os.environ.get(env_name)):
-            os.environ[env_name] = value
+            value = secrets.get(env_name)
+            if value:
+                values[env_name] = str(value)
+    except Exception:
+        pass
+    return values
+
+
+def get_effective_api_env_values(provider: str) -> dict[str, str]:
+    return effective_environment(
+        MANAGED_ENV_NAMES,
+        get_api_env_values(provider),
+        get_streamlit_secret_values(),
+    )
 
 
 def missing_required_credentials(provider: str, env_values: dict[str, str]) -> list[str]:
@@ -1078,9 +1113,11 @@ def _run_analysis_thread(
 ):
     """Run analysis in a background thread, writing results to shared state dict."""
     with RUN_ENV_LOCK:
+        environment_context = None
         try:
             runtime_provider, backend_url, runtime_env_values = get_runtime_llm_config(provider, api_env_values)
-            apply_api_env_values(runtime_env_values)
+            environment_context = temporary_environment(runtime_env_values)
+            environment_context.__enter__()
 
             from cli.stats_handler import StatsCallbackHandler
             from tradingagents.graph.trading_graph import TradingAgentsGraph
@@ -1221,40 +1258,15 @@ def _run_analysis_thread(
 
             # Final
             final_state = chunks[-1] if chunks else {}
-            # Save reports
-            results_dir = Path(config["results_dir"]) / ticker / date_str
-            results_dir.mkdir(parents=True, exist_ok=True)
-            report_dir = results_dir / "reports"
-            report_dir.mkdir(parents=True, exist_ok=True)
-
-            all_sections = {
-                "market_report": final_state.get("market_report"),
-                "sentiment_report": final_state.get("sentiment_report"),
-                "news_report": final_state.get("news_report"),
-                "fundamentals_report": final_state.get("fundamentals_report"),
-                "investment_plan": final_state.get("investment_plan"),
-                "trader_investment_plan": final_state.get("trader_investment_plan"),
-                "final_trade_decision": final_state.get("final_trade_decision"),
-            }
-            for sn, content in all_sections.items():
-                if content:
-                    text = "\n".join(str(i) for i in content) if isinstance(content, list) else str(content)
-                    (report_dir / f"{sn}.md").write_text(text, encoding="utf-8")
-
-            complete = []
-            for sn, content in all_sections.items():
-                if content:
-                    text = "\n".join(str(i) for i in content) if isinstance(content, list) else str(content)
-                    complete.append(f"## {sn.replace('_', ' ').title()}\n\n{text}")
-            complete_report = "\n\n---\n\n".join(complete)
-            complete_report_path = report_dir / "complete_report.md"
-            complete_report_path.write_text(complete_report, encoding="utf-8")
-            model_report_name = (
-                "complete_report__"
-                f"deep-{safe_report_filename_part(deep_model)}.md"
+            report_dir, complete_report = save_ui_reports(
+                final_state,
+                ticker,
+                date_str,
+                config["results_dir"],
+                deep_model,
+                safe_report_filename_part,
             )
-            model_report_path = report_dir / model_report_name
-            model_report_path.write_text(complete_report, encoding="utf-8")
+            complete_report_path = report_dir / "complete_report.md"
 
             # Create a symlink to the latest report in the user data directory.
             latest_symlink = Path.home() / ".tradingagents" / "latest_report.md"
@@ -1279,8 +1291,8 @@ def _run_analysis_thread(
             state["error"] = str(e)
             state["traceback"] = traceback.format_exc()
         finally:
-            for env_name in MANAGED_ENV_NAMES:
-                os.environ.pop(env_name, None)
+            if environment_context is not None:
+                environment_context.__exit__(None, None, None)
             state["done"] = True
 
 
@@ -1480,7 +1492,7 @@ def render_sidebar_brand():
             )
 
     st.markdown(
-        '<div class="sidebar-brand-meta">v1.2.0 &middot; INDUSTRIAL CONTROL PANEL</div>'
+        f'<div class="sidebar-brand-meta">v{html_lib.escape(ui_version())} &middot; INDUSTRIAL CONTROL PANEL</div>'
         '<div class="sidebar-brand-rule"></div>',
         unsafe_allow_html=True,
     )
@@ -1523,6 +1535,8 @@ def render_sidebar_brand():
             "</div>",
             unsafe_allow_html=True,
         )
+    elif update_status.get("notice"):
+        st.caption(str(update_status["notice"]))
 
 
 def render_sidebar():
@@ -1678,7 +1692,7 @@ def render_sidebar():
             else:
                 st.toast("Preferences saved. API keys stay session-only.", icon="✅")
 
-    api_env_values = get_api_env_values(provider_key)
+    api_env_values = get_effective_api_env_values(provider_key)
     run_settings = {**advanced_settings, "data_vendors": data_vendors}
     return (
         ticker, analysis_date, language, analysts, depth_key, provider_key,
@@ -1714,6 +1728,13 @@ def main():
     tab_run, tab_reports = st.tabs(["Run Analysis", "Browse Reports"])
 
     with tab_run:
+        ticker_path_error = None
+        if ticker:
+            try:
+                ticker = validate_ticker_for_run(ticker)
+            except ValueError as exc:
+                ticker_path_error = str(exc)
+
         # Start button
         col_btn, col_info = st.columns([1, 5])
         with col_btn:
@@ -1749,6 +1770,8 @@ def main():
         if run_clicked:
             if not ticker:
                 st.error("Please enter a ticker symbol.")
+            elif ticker_path_error:
+                st.error(f"Invalid ticker: {ticker_path_error}")
             elif not analysts:
                 st.error("Please select at least one analyst.")
             elif not quick_model or not deep_model:

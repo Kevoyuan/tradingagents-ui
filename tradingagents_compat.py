@@ -12,6 +12,14 @@ TRADINGAGENTS_MIN_VERSION = (0, 3, 1)
 TRADINGAGENTS_MAX_VERSION = (0, 4, 0)
 
 
+def ui_version() -> str:
+    """Read the UI package version from installed package metadata."""
+    try:
+        return importlib.metadata.version("tradingagents-ui")
+    except importlib.metadata.PackageNotFoundError:
+        return "unknown"
+
+
 def version_tuple(value: str) -> tuple[int, int, int] | None:
     match = re.match(r"^v?(\d+)\.(\d+)\.(\d+)", value.strip())
     return tuple(map(int, match.groups())) if match else None

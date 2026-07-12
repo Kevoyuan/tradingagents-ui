@@ -6,6 +6,24 @@ from typing import Any
 
 import streamlit as st
 
+DEFAULT_DATA_VENDORS = {
+    "core_stock_apis": "yfinance",
+    "technical_indicators": "yfinance",
+    "fundamental_data": "yfinance",
+    "news_data": "yfinance",
+    "macro_data": "fred",
+    "prediction_markets": "polymarket",
+}
+
+SUPPORTED_DATA_VENDORS = {
+    "core_stock_apis": {"yfinance", "alpha_vantage"},
+    "technical_indicators": {"yfinance", "alpha_vantage"},
+    "fundamental_data": {"yfinance", "alpha_vantage"},
+    "news_data": {"yfinance", "alpha_vantage"},
+    "macro_data": {"fred"},
+    "prediction_markets": {"polymarket"},
+}
+
 
 def _safe_index(options: list[Any], value: Any) -> int:
     return options.index(value) if value in options else 0
@@ -67,14 +85,7 @@ def render_advanced_settings(provider: str, saved: dict[str, Any]) -> dict[str, 
 
 
 def render_data_vendor_settings(saved: dict[str, str]) -> dict[str, str]:
-    defaults = {
-        "core_stock_apis": "yfinance",
-        "technical_indicators": "yfinance",
-        "fundamental_data": "yfinance",
-        "news_data": "yfinance",
-        "macro_data": "fred",
-        "prediction_markets": "polymarket",
-    }
+    defaults = DEFAULT_DATA_VENDORS
     values = {**defaults, **saved}
     with st.expander("Data Sources", expanded=False):
         st.caption("Each selection is exact. TradingAgents does not silently add an unselected fallback.")
@@ -89,18 +100,9 @@ def render_data_vendor_settings(saved: dict[str, str]) -> dict[str, str]:
             options = ["yfinance", "alpha_vantage", "yfinance,alpha_vantage"]
             current = values.get(key, defaults[key])
             result[key] = st.selectbox(label, options, index=options.index(current) if current in options else 0)
-        macro_options = ["fred", "disabled"]
-        prediction_options = ["polymarket", "disabled"]
-        result["macro_data"] = st.selectbox(
-            "Macro data",
-            macro_options,
-            index=_safe_index(macro_options, values.get("macro_data")),
-            help="FRED requires FRED_API_KEY. Disabled tool calls return an explicit unavailable result.",
-        )
-        result["prediction_markets"] = st.selectbox(
-            "Prediction markets",
-            prediction_options,
-            index=_safe_index(prediction_options, values.get("prediction_markets")),
-            help="Polymarket is keyless. Disabled tool calls return an explicit unavailable result.",
+        result["macro_data"] = "fred"
+        result["prediction_markets"] = "polymarket"
+        st.caption(
+            "Macro data uses FRED when configured (FRED_API_KEY is optional). Prediction markets use Polymarket."
         )
         return result
