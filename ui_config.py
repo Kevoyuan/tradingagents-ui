@@ -1,4 +1,9 @@
-"""Shared UI configuration constants for TradingAgents Streamlit app."""
+"""Shared UI configuration, with upstream metadata as the source of truth."""
+
+try:
+    from tradingagents.llm_clients.api_key_env import PROVIDER_API_KEY_ENV as UPSTREAM_API_KEY_ENV
+except (ImportError, ModuleNotFoundError):
+    UPSTREAM_API_KEY_ENV = {}
 
 ANALYST_OPTIONS = [
     ("Market Analyst", "market"),
@@ -33,7 +38,13 @@ PROVIDERS = [
     ("TradingAgents · Ollama", "ollama"),
     ("TradingAgents · MiniMax", "minimax"),
     ("TradingAgents · MiniMax (CN)", "minimax-cn"),
-    ("Custom · Kimi Coding Plan", "kimi"),
+    ("TradingAgents · Mistral", "mistral"),
+    ("TradingAgents · Kimi (Moonshot)", "kimi"),
+    ("TradingAgents · Groq", "groq"),
+    ("TradingAgents · NVIDIA NIM", "nvidia"),
+    ("TradingAgents · Bedrock", "bedrock"),
+    ("TradingAgents · OpenAI-compatible", "openai_compatible"),
+    ("Custom · Kimi Coding Plan", "kimi_coding"),
     ("Custom · Moonshot", "moonshot"),
     ("Custom · DeepSeek Anthropic API", "deepseek_anthropic"),
     ("Custom · Volcengine Ark Coding", "volcengine"),
@@ -42,7 +53,6 @@ PROVIDERS = [
     ("Custom · Aliyun Bailian Coding", "bailian"),
     ("Custom · Ollama Anthropic API", "ollama_anthropic"),
     ("Custom · LiteLLM Anthropic API", "litellm"),
-    ("Compatible · Custom OpenAI API", "custom_openai"),
     ("Compatible · Custom Anthropic API", "custom_anthropic"),
 ]
 
@@ -58,7 +68,13 @@ PROVIDER_URLS = {
     "azure": None, "ollama": "http://localhost:11434/v1",
     "minimax": "https://api.minimax.io/v1",
     "minimax-cn": "https://api.minimaxi.com/v1",
-    "kimi": "https://api.kimi.com/coding/",
+    "mistral": "https://api.mistral.ai/v1",
+    "kimi": "https://api.moonshot.ai/v1",
+    "groq": "https://api.groq.com/openai/v1",
+    "nvidia": "https://integrate.api.nvidia.com/v1",
+    "bedrock": None,
+    "openai_compatible": "",
+    "kimi_coding": "https://api.kimi.com/coding/",
     "moonshot": "https://api.moonshot.cn/anthropic",
     "deepseek_anthropic": "https://api.deepseek.com/anthropic",
     "volcengine": "https://ark.cn-beijing.volces.com/api/coding",
@@ -85,7 +101,8 @@ PROVIDER_API_KEY_ENV = {
     "azure": "AZURE_OPENAI_API_KEY",
     "minimax": "MINIMAX_API_KEY",
     "minimax-cn": "MINIMAX_CN_API_KEY",
-    "kimi": "KIMI_API_KEY",
+    **UPSTREAM_API_KEY_ENV,
+    "kimi_coding": "KIMI_API_KEY",
     "moonshot": "MOONSHOT_API_KEY",
     "deepseek_anthropic": "DEEPSEEK_ANTHROPIC_API_KEY",
     "volcengine": "ARK_API_KEY",
@@ -94,7 +111,7 @@ PROVIDER_API_KEY_ENV = {
     "bailian": "BAILIAN_API_KEY",
     "ollama_anthropic": "OLLAMA_ANTHROPIC_API_KEY",
     "litellm": "LITELLM_API_KEY",
-    "custom_openai": "CUSTOM_OPENAI_API_KEY",
+    "custom_openai": "CUSTOM_OPENAI_API_KEY",  # legacy preference/env migration only
     "custom_anthropic": "CUSTOM_ANTHROPIC_API_KEY",
 }
 
@@ -104,8 +121,15 @@ AZURE_ENV_FIELDS = (
     ("OPENAI_API_VERSION", "Azure API Version", "2025-03-01-preview"),
 )
 
+BEDROCK_ENV_FIELDS = (
+    ("AWS_BEARER_TOKEN_BEDROCK", "Bedrock Bearer Token", "Optional when using the AWS credential chain", True),
+    ("AWS_DEFAULT_REGION", "AWS Region", "us-west-2", False),
+    ("AWS_PROFILE", "AWS Profile", "Optional named profile", False),
+)
+
 PROVIDER_BASE_URL_ENV = {
-    "kimi": "KIMI_BASE_URL",
+    "openai_compatible": "OPENAI_COMPATIBLE_BASE_URL",
+    "kimi_coding": "KIMI_BASE_URL",
     "moonshot": "MOONSHOT_BASE_URL",
     "deepseek_anthropic": "DEEPSEEK_ANTHROPIC_BASE_URL",
     "volcengine": "ARK_BASE_URL",
@@ -119,7 +143,7 @@ PROVIDER_BASE_URL_ENV = {
 }
 
 PROVIDER_RUNTIME = {
-    "kimi": "anthropic",
+    "kimi_coding": "anthropic",
     "moonshot": "anthropic",
     "deepseek_anthropic": "anthropic",
     "volcengine": "anthropic",
@@ -128,14 +152,14 @@ PROVIDER_RUNTIME = {
     "bailian": "anthropic",
     "ollama_anthropic": "anthropic",
     "litellm": "anthropic",
-    "custom_openai": "openrouter",
+    "custom_openai": "openai_compatible",
     "custom_anthropic": "anthropic",
 }
 
-OPTIONAL_API_KEY_PROVIDERS = {"ollama", "ollama_anthropic", "litellm"}
+OPTIONAL_API_KEY_PROVIDERS = {"ollama", "openai_compatible", "custom_openai", "ollama_anthropic", "litellm"}
 
 PROVIDER_MODEL_OPTIONS = {
-    "kimi": {
+    "kimi_coding": {
         "quick": [("Kimi K2.5", "sonnet"), ("Custom model ID", "custom")],
         "deep": [("Kimi K2.5", "sonnet"), ("Custom model ID", "custom")],
     },

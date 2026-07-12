@@ -25,17 +25,27 @@ from dotenv import dotenv_values, set_key, unset_key
 try:
     from tradingagents.default_config import DEFAULT_CONFIG
     from tradingagents.llm_clients.model_catalog import MODEL_OPTIONS
-except ModuleNotFoundError:
+except (ImportError, ModuleNotFoundError):
     DEFAULT_CONFIG = {}
     MODEL_OPTIONS = {}
 
 from preferences import PREFS_DIR, load_preferences, save_preferences
+from provider_migrations import PROVIDER_SCHEMA_VERSION, migrate_provider_preferences
+from tradingagents_adapter import TradingAgentsAdapter, detect_asset_type
+from tradingagents_compat import (
+    TRADINGAGENTS_REPO_URL,
+    TRADINGAGENTS_TARGET_TAG,
+    tagged_install_requirement,
+    tradingagents_compatibility,
+)
+from ui_advanced import render_advanced_settings, render_data_vendor_settings
 from ui_config import (
     ALL_TEAMS,
     ANALYST_KEY_MAP,
     ANALYST_OPTIONS,
     ANALYST_REPORT_MAP,
     AZURE_ENV_FIELDS,
+    BEDROCK_ENV_FIELDS,
     DEPTH_OPTIONS,
     LANGUAGES,
     OPTIONAL_API_KEY_PROVIDERS,
@@ -51,13 +61,18 @@ from ui_styles import CUSTOM_CSS
 
 MANAGED_ENV_NAMES = tuple(
     dict.fromkeys(
-        [
+        env_name for env_name in [
             *PROVIDER_API_KEY_ENV.values(),
             *PROVIDER_BASE_URL_ENV.values(),
             *(env_name for env_name, _, _ in AZURE_ENV_FIELDS),
+            *(env_name for env_name, _, _, _ in BEDROCK_ENV_FIELDS),
             "ALPHA_VANTAGE_API_KEY",
+            "FRED_API_KEY",
             "ANTHROPIC_AUTH_TOKEN",
+            "CUSTOM_OPENAI_API_KEY",
+            "CUSTOM_OPENAI_BASE_URL",
         ]
+        if env_name
     )
 )
 RUN_ENV_LOCK = threading.Lock()
@@ -67,7 +82,6 @@ BAOYU_MARKDOWN_TO_HTML_SCRIPT = PROJECT_ROOT / "tools" / "baoyu-markdown-to-html
 BAOYU_MARKDOWN_TO_HTML_DIR = BAOYU_MARKDOWN_TO_HTML_SCRIPT.parent
 BAOYU_INSTALL_LOCK = threading.Lock()
 HTML_REPORT_THEME_VERSION = "quant-terminal-readme-shot-v2"
-TRADINGAGENTS_REPO_URL = "https://github.com/TauricResearch/TradingAgents.git"
 
 
 def is_local_persistence_enabled() -> bool:
@@ -119,13 +133,11 @@ def normalize_version_tag(value: object) -> str:
 
 
 def latest_remote_tradingagents_tag() -> str:
-    output = git_output(["git", "ls-remote", "--tags", "--refs", TRADINGAGENTS_REPO_URL], timeout=20)
-    tags = []
-    for line in output.splitlines():
-        ref = line.rsplit("/", 1)[-1].strip()
-        if ref:
-            tags.append(ref)
-    return sorted(tags, key=tag_sort_key)[-1] if tags else "unknown"
+    output = git_output(
+        ["git", "ls-remote", "--tags", "--refs", TRADINGAGENTS_REPO_URL, f"refs/tags/{TRADINGAGENTS_TARGET_TAG}"],
+        timeout=20,
+    )
+    return TRADINGAGENTS_TARGET_TAG if output else "unknown"
 
 
 def latest_local_checkout_tag(repo_dir: Path) -> str:
@@ -207,24 +219,31 @@ def update_tradingagents_from_app(status: dict[str, str | bool]) -> tuple[bool, 
         if checkout_has_local_changes(repo_dir):
             return False, f"Local TradingAgents checkout has uncommitted changes: {repo_dir}"
         try:
-            try:
-                subprocess.run(["git", "pull", "--ff-only"], cwd=repo_dir, check=True, text=True, capture_output=True)
-            except subprocess.CalledProcessError:
-                subprocess.run(["git", "pull", "--rebase"], cwd=repo_dir, check=True, text=True, capture_output=True)
+            subprocess.run(
+                [
+                    "git", "fetch", "origin",
+                    f"refs/tags/{TRADINGAGENTS_TARGET_TAG}:refs/tags/{TRADINGAGENTS_TARGET_TAG}",
+                ],
+                cwd=repo_dir, check=True, text=True, capture_output=True,
+            )
+            subprocess.run(
+                ["git", "checkout", "--detach", TRADINGAGENTS_TARGET_TAG],
+                cwd=repo_dir, check=True, text=True, capture_output=True,
+            )
             subprocess.run([sys.executable, "-m", "pip", "install", "-e", str(repo_dir), "--quiet"], check=True)
-            return True, f"Updated local TradingAgents checkout: {repo_dir}"
+            return True, f"Installed TradingAgents {TRADINGAGENTS_TARGET_TAG} from local checkout: {repo_dir}"
         except subprocess.CalledProcessError as exc:
             detail = (exc.stderr or exc.stdout or str(exc)).strip()
             return False, detail
 
     try:
         subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-U", f"git+{TRADINGAGENTS_REPO_URL}", "--quiet"],
+            [sys.executable, "-m", "pip", "install", "-U", tagged_install_requirement(), "--quiet"],
             check=True,
             text=True,
             capture_output=True,
         )
-        return True, "Installed or updated TradingAgents from GitHub."
+        return True, f"Installed TradingAgents {TRADINGAGENTS_TARGET_TAG} from GitHub."
     except subprocess.CalledProcessError as exc:
         detail = (exc.stderr or exc.stdout or str(exc)).strip()
         return False, detail
@@ -366,7 +385,10 @@ def sync_provider_api_key_input(provider: str, profile_id: str):
 
 def init_session_state():
     if "initialized" not in st.session_state:
-        prefs = load_preferences()
+        raw_prefs = load_preferences()
+        prefs, migration_notes = migrate_provider_preferences(raw_prefs)
+        if prefs != raw_prefs:
+            save_preferences(prefs)
         saved_env = load_saved_api_env_values() if is_local_persistence_enabled() else {}
 
         st.session_state.ticker = prefs.get("ticker", "")
@@ -379,14 +401,27 @@ def init_session_state():
         st.session_state.deep_model = prefs.get("deep_think_llm", "")
         st.session_state.provider_model_profiles = prefs.get("provider_model_profiles", {})
         st.session_state.api_key_profiles = prefs.get("api_key_profiles", {}) if is_local_persistence_enabled() else {}
+        st.session_state.provider_migration_notes = migration_notes
+        st.session_state.advanced_settings = dict(prefs.get("advanced_settings", {}) or {})
+        st.session_state.data_vendors = dict(prefs.get("data_vendors", {}) or {})
 
         for provider, env_name in PROVIDER_API_KEY_ENV.items():
-            st.session_state[f"api_key_{provider}"] = saved_env.get(env_name, "")
+            if env_name:
+                st.session_state[f"api_key_{provider}"] = saved_env.get(env_name, "")
         for provider, env_name in PROVIDER_BASE_URL_ENV.items():
             st.session_state[f"base_url_{provider}"] = saved_env.get(env_name, PROVIDER_URLS.get(provider, "") or "")
         for env_name, _, _ in AZURE_ENV_FIELDS:
             st.session_state[env_name] = saved_env.get(env_name, "")
+        for env_name, _, _, _ in BEDROCK_ENV_FIELDS:
+            st.session_state[env_name] = saved_env.get(env_name, "")
         st.session_state["ALPHA_VANTAGE_API_KEY"] = saved_env.get("ALPHA_VANTAGE_API_KEY", "")
+        st.session_state["FRED_API_KEY"] = saved_env.get("FRED_API_KEY", "")
+
+        # Preserve legacy custom OpenAI credentials under the native v0.3.1 provider.
+        if not st.session_state.get("api_key_openai_compatible"):
+            st.session_state["api_key_openai_compatible"] = saved_env.get("CUSTOM_OPENAI_API_KEY", "")
+        if not st.session_state.get("base_url_openai_compatible"):
+            st.session_state["base_url_openai_compatible"] = saved_env.get("CUSTOM_OPENAI_BASE_URL", "")
 
         # Analysis state
         st.session_state.running = False
@@ -413,6 +448,9 @@ def save_current_config():
         "quick_think_llm": st.session_state.get("quick_model", ""),
         "deep_think_llm": st.session_state.get("deep_model", ""),
         "provider_model_profiles": st.session_state.get("provider_model_profiles", {}),
+        "provider_schema_version": PROVIDER_SCHEMA_VERSION,
+        "advanced_settings": st.session_state.get("advanced_settings", {}),
+        "data_vendors": st.session_state.get("data_vendors", {}),
         **(
             {"api_key_profiles": st.session_state.get("api_key_profiles", {})}
             if is_local_persistence_enabled()
@@ -440,12 +478,16 @@ def get_all_api_env_values() -> dict[str, str]:
     """Collect all secret fields, including currently hidden provider keys."""
     env_values = {}
     for provider, env_name in PROVIDER_API_KEY_ENV.items():
-        env_values[env_name] = st.session_state.get(f"api_key_{provider}", "").strip()
+        if env_name:
+            env_values[env_name] = st.session_state.get(f"api_key_{provider}", "").strip()
     for provider, env_name in PROVIDER_BASE_URL_ENV.items():
         env_values[env_name] = st.session_state.get(f"base_url_{provider}", "").strip()
     for env_name, _, _ in AZURE_ENV_FIELDS:
         env_values[env_name] = st.session_state.get(env_name, "").strip()
+    for env_name, _, _, _ in BEDROCK_ENV_FIELDS:
+        env_values[env_name] = st.session_state.get(env_name, "").strip()
     env_values["ALPHA_VANTAGE_API_KEY"] = st.session_state.get("ALPHA_VANTAGE_API_KEY", "").strip()
+    env_values["FRED_API_KEY"] = st.session_state.get("FRED_API_KEY", "").strip()
     return env_values
 
 
@@ -493,10 +535,18 @@ def get_api_env_values(provider: str) -> dict[str, str]:
             value = st.session_state.get(env_name, "").strip()
             if value:
                 env_values[env_name] = value
+    if provider == "bedrock":
+        for env_name, _, _, _ in BEDROCK_ENV_FIELDS:
+            value = st.session_state.get(env_name, "").strip()
+            if value:
+                env_values[env_name] = value
 
     alpha_vantage_key = st.session_state.get("ALPHA_VANTAGE_API_KEY", "").strip()
     if alpha_vantage_key:
         env_values["ALPHA_VANTAGE_API_KEY"] = alpha_vantage_key
+    fred_key = st.session_state.get("FRED_API_KEY", "").strip()
+    if fred_key:
+        env_values["FRED_API_KEY"] = fred_key
 
     return env_values
 
@@ -525,6 +575,8 @@ def missing_required_credentials(provider: str, env_values: dict[str, str]) -> l
         for env_name, _, _ in AZURE_ENV_FIELDS:
             if not env_values.get(env_name):
                 missing.append(env_name)
+    if provider == "bedrock" and importlib.util.find_spec("langchain_aws") is None:
+        missing.append('Bedrock dependencies (`uv pip install -e ".[bedrock]"`)')
 
     base_url_env = PROVIDER_BASE_URL_ENV.get(provider)
     if base_url_env and not (
@@ -1021,7 +1073,8 @@ def render_report_with_nav(
 # ── Analysis Runner (background thread) ────────────────────────────────────────
 
 def _run_analysis_thread(
-    ticker, date, language, analysts, depth, provider, quick_model, deep_model, api_env_values, state
+    ticker, date, language, analysts, depth, provider, quick_model, deep_model,
+    api_env_values, run_settings, state,
 ):
     """Run analysis in a background thread, writing results to shared state dict."""
     with RUN_ENV_LOCK:
@@ -1043,6 +1096,7 @@ def _run_analysis_thread(
             config["backend_url"] = backend_url
             config["llm_provider"] = runtime_provider
             config["output_language"] = language
+            config.update({key: value for key, value in run_settings.items() if value is not None})
 
             stats_handler = StatsCallbackHandler()
 
@@ -1066,14 +1120,13 @@ def _run_analysis_thread(
 
             state["messages"].append((now_str(), "System", f"Analyzing {ticker} on {date_str}"))
 
-            graph = TradingAgentsGraph(analysts, config=config, debug=True, callbacks=[stats_handler])
-            init_state = graph.propagator.create_initial_state(ticker, date_str)
-            args = graph.propagator.get_graph_args(callbacks=[stats_handler])
+            graph = TradingAgentsGraph(analysts, config=config, debug=False, callbacks=[stats_handler])
+            runner = TradingAgentsAdapter(graph, callbacks=[stats_handler])
 
             seen_message_ids = set()
             seen_tool_call_ids = set()
 
-            for chunk in graph.graph.stream(init_state, **args):
+            for chunk in runner.stream(ticker, date_str, asset_type=detect_asset_type(ticker)):
                 chunks.append(chunk)
 
                 # Extract messages from various chunk formats (updates or full state)
@@ -1168,9 +1221,6 @@ def _run_analysis_thread(
 
             # Final
             final_state = chunks[-1] if chunks else {}
-            if final_state.get("final_trade_decision"):
-                graph.process_signal(final_state.get("final_trade_decision", ""))
-
             # Save reports
             results_dir = Path(config["results_dir"]) / ticker / date_str
             results_dir.mkdir(parents=True, exist_ok=True)
@@ -1478,6 +1528,9 @@ def render_sidebar_brand():
 def render_sidebar():
     with st.sidebar:
         render_sidebar_brand()
+        migration_notes = st.session_state.get("provider_migration_notes", [])
+        if migration_notes:
+            st.info(" ".join(str(note) for note in migration_notes))
 
         ticker = st.text_input("Ticker Symbol", value=st.session_state.ticker, placeholder="SPY, NVDA, 0700.HK")
         ticker = ticker.strip().upper()
@@ -1556,7 +1609,7 @@ def render_sidebar():
             active_value = st.session_state.get(f"api_key_{provider_key}", "").strip()
             st.session_state.setdefault("api_key_profiles", {}).setdefault(provider_key, {})[profile_id] = active_value
         else:
-            st.caption("Ollama does not require an API key.")
+            st.caption("This provider uses local or platform credentials instead of a single API key field.")
 
         base_url_env = PROVIDER_BASE_URL_ENV.get(provider_key)
         if base_url_env:
@@ -1579,6 +1632,25 @@ def render_sidebar():
                     help=credential_help_text(),
                 )
 
+        if provider_key == "bedrock":
+            st.info(
+                "Amazon Bedrock uses AWS_BEARER_TOKEN_BEDROCK or the standard AWS credential chain. "
+                'Install support with `uv pip install -e ".[bedrock]"`.'
+            )
+            for env_name, label, placeholder, secret in BEDROCK_ENV_FIELDS:
+                st.text_input(
+                    label,
+                    type="password" if secret else "default",
+                    key=env_name,
+                    placeholder=placeholder,
+                    help=credential_help_text() if secret else None,
+                )
+
+        advanced_settings = render_advanced_settings(provider_key, st.session_state.advanced_settings)
+        st.session_state.advanced_settings = advanced_settings
+        data_vendors = render_data_vendor_settings(st.session_state.data_vendors)
+        st.session_state.data_vendors = data_vendors
+
         with st.expander("Data API Keys", expanded=False):
             st.text_input(
                 "Alpha Vantage API Key",
@@ -1590,6 +1662,13 @@ def render_sidebar():
                     f" {credential_help_text()}"
                 ),
             )
+            st.text_input(
+                "FRED API Key",
+                type="password",
+                key="FRED_API_KEY",
+                placeholder="FRED_API_KEY",
+                help=f"Required for configured FRED macro data. {credential_help_text()}",
+            )
 
         st.divider()
         if st.button("Save Preferences", use_container_width=True):
@@ -1600,7 +1679,11 @@ def render_sidebar():
                 st.toast("Preferences saved. API keys stay session-only.", icon="✅")
 
     api_env_values = get_api_env_values(provider_key)
-    return ticker, analysis_date, language, analysts, depth_key, provider_key, quick_model, deep_model, api_env_values
+    run_settings = {**advanced_settings, "data_vendors": data_vendors}
+    return (
+        ticker, analysis_date, language, analysts, depth_key, provider_key,
+        quick_model, deep_model, api_env_values, run_settings,
+    )
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -1611,6 +1694,9 @@ def main():
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
     init_session_state()
+    compatibility = tradingagents_compatibility()
+    if not compatibility.compatible:
+        st.error(compatibility.message)
 
     (
         ticker,
@@ -1622,6 +1708,7 @@ def main():
         quick_model,
         deep_model,
         api_env_values,
+        run_settings,
     ) = render_sidebar()
 
     tab_run, tab_reports = st.tabs(["Run Analysis", "Browse Reports"])
@@ -1634,7 +1721,8 @@ def main():
                 "Run Analysis",
                 type="primary",
                 use_container_width=True,
-                disabled=st.session_state.get("running", False),
+                disabled=st.session_state.get("running", False) or not compatibility.compatible,
+                help=None if compatibility.compatible else compatibility.message,
             )
         with col_info:
             summary = {
@@ -1667,7 +1755,7 @@ def main():
                 st.error("Please select both thinking models.")
             elif missing_required_credentials(provider_key, api_env_values):
                 missing = ", ".join(missing_required_credentials(provider_key, api_env_values))
-                st.error(f"Please enter required credentials: {missing}")
+                st.error(f"Configuration required: {missing}")
             else:
                 save_current_config()
                 # Reset analysis state
@@ -1708,7 +1796,7 @@ def main():
                 thread = threading.Thread(
                     target=_run_analysis_thread,
                     args=(ticker, analysis_date, language, analysts, DEPTH_OPTIONS[depth_key],
-                          provider_key, quick_model, deep_model, api_env_values, state),
+                          provider_key, quick_model, deep_model, api_env_values, run_settings, state),
                     daemon=True,
                 )
                 thread.start()

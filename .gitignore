@@ -5,6 +5,8 @@ scripts/watch-sync-to-app.sh
 .gstack/
 .streamlit/secrets.toml
 tests/
+!tests/
+!tests/*.py
 tradingagents-promo/
 node_modules/
 .DS_Store

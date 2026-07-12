@@ -10,8 +10,11 @@ requires-python = ">=3.10"
 dependencies = [
     "streamlit>=1.30.0",
     "python-dotenv>=1.0.0",
-    "tradingagents @ git+https://github.com/TauricResearch/TradingAgents.git",
+    "tradingagents @ git+https://github.com/TauricResearch/TradingAgents.git@v0.3.1",
 ]
+
+[project.optional-dependencies]
+bedrock = ["langchain-aws>=1.5.0"]
 
 [project.scripts]
 trade-ui = "trade_ui.cli:main"

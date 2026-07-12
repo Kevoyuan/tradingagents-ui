@@ -1,0 +1,154 @@
+from __future__ import annotations
+
+from types import SimpleNamespace
+
+import pytest
+
+from provider_migrations import migrate_provider_preferences
+from tradingagents_adapter import TradingAgentsAdapter, detect_asset_type
+from tradingagents_compat import TRADINGAGENTS_TARGET_TAG, tagged_install_requirement, tradingagents_compatibility
+from ui_config import PROVIDER_API_KEY_ENV, PROVIDER_RUNTIME, PROVIDERS
+
+
+def test_native_provider_ids_align_with_v031():
+    expected = {
+        "openai", "anthropic", "google", "azure", "bedrock", "xai", "deepseek",
+        "qwen", "qwen-cn", "glm", "glm-cn", "minimax", "minimax-cn", "openrouter",
+        "mistral", "kimi", "groq", "nvidia", "ollama", "openai_compatible",
+    }
+    visible = {provider_id for _, provider_id in PROVIDERS}
+    assert expected <= visible
+    assert expected <= set(PROVIDER_API_KEY_ENV)
+
+
+def test_upstream_claude_5_models_are_visible():
+    from tradingagents.llm_clients.model_catalog import MODEL_OPTIONS
+
+    models = {model for options in MODEL_OPTIONS["anthropic"].values() for _, model in options}
+    assert {"claude-sonnet-5", "claude-fable-5"} <= models
+
+
+def test_kimi_and_custom_openai_preferences_migrate_once():
+    migrated, notes = migrate_provider_preferences(
+        {
+            "llm_provider": "kimi",
+            "provider_model_profiles": {"kimi": {"quick": "sonnet"}},
+        }
+    )
+    assert migrated["llm_provider"] == "kimi_coding"
+    assert migrated["provider_model_profiles"]["kimi_coding"]["quick"] == "sonnet"
+    assert notes
+    again, second_notes = migrate_provider_preferences({**migrated, "llm_provider": "kimi"})
+    assert again["llm_provider"] == "kimi"
+    assert second_notes == []
+
+
+def test_legacy_custom_openai_uses_native_runtime():
+    assert PROVIDER_RUNTIME["custom_openai"] == "openai_compatible"
+    import app
+
+    runtime, base_url, env = app.get_runtime_llm_config(
+        "custom_openai",
+        {
+            "CUSTOM_OPENAI_API_KEY": "test-placeholder",
+            "CUSTOM_OPENAI_BASE_URL": "http://localhost:1234/v1",
+        },
+    )
+    assert runtime == "openai_compatible"
+    assert base_url == "http://localhost:1234/v1"
+    assert env["OPENAI_COMPATIBLE_API_KEY"] == "test-placeholder"
+
+
+def test_update_installs_exact_tag(monkeypatch):
+    import app
+
+    calls = []
+    monkeypatch.setattr(app.subprocess, "run", lambda args, **kwargs: calls.append(args) or SimpleNamespace())
+    ok, message = app.update_tradingagents_from_app({})
+    assert ok
+    assert TRADINGAGENTS_TARGET_TAG in message
+    assert calls[0][-2] == tagged_install_requirement()
+    assert calls[0][-2].endswith("@v0.3.1")
+
+
+@pytest.mark.parametrize("ticker", ["BTC-USD", "ETH-USD", "SOL/USDT"])
+def test_crypto_ticker_detection(ticker):
+    assert detect_asset_type(ticker) == "crypto"
+
+
+def test_stock_ticker_not_misclassified():
+    assert detect_asset_type("NVDA") == "stock"
+
+
+def test_checkpoint_thread_id_includes_graph_shape():
+    from tradingagents.graph.checkpointer import thread_id
+
+    base = thread_id("BTC-USD", "2026-07-12", "analysts=market|debate=1|risk=1|asset=crypto")
+    assert base != thread_id("BTC-USD", "2026-07-12", "analysts=news|debate=1|risk=1|asset=crypto")
+    assert base != thread_id("BTC-USD", "2026-07-12", "analysts=market|debate=3|risk=3|asset=crypto")
+    assert base != thread_id("BTC-USD", "2026-07-12", "analysts=market|debate=1|risk=1|asset=stock")
+
+
+def test_incompatible_version_returns_ui_safe_status():
+    assert not tradingagents_compatibility("0.3.0").compatible
+    assert "too old" in tradingagents_compatibility("0.3.0").message
+    assert not tradingagents_compatibility("0.4.0").compatible
+    assert tradingagents_compatibility("0.3.1").compatible
+
+
+def test_checkpoint_enabled_uses_compiled_checkpoint_graph(monkeypatch):
+    import tradingagents.graph.checkpointer as checkpoint_module
+
+    events = []
+
+    class Context:
+        def __enter__(self):
+            events.append("checkpoint-enter")
+            return "saver"
+
+        def __exit__(self, *_args):
+            events.append("checkpoint-exit")
+
+    monkeypatch.setattr(checkpoint_module, "get_checkpointer", lambda *_args: Context())
+    monkeypatch.setattr(checkpoint_module, "clear_checkpoint", lambda *_args: events.append("checkpoint-clear"))
+    monkeypatch.setattr(checkpoint_module, "thread_id", lambda *_args: "shape-aware-thread")
+
+    stream_graph = SimpleNamespace(
+        stream=lambda initial, **args: iter([
+            {**initial, "final_trade_decision": "HOLD", "messages": []},
+        ])
+    )
+    workflow = SimpleNamespace(
+        compile=lambda checkpointer=None: events.append(("compile", checkpointer)) or stream_graph
+    )
+    propagator = SimpleNamespace(
+        create_initial_state=lambda ticker, date, **kwargs: {
+            "company_of_interest": ticker,
+            "trade_date": date,
+            **kwargs,
+        },
+        get_graph_args=lambda callbacks=None: {"config": {}, "stream_mode": "values"},
+    )
+    memory = SimpleNamespace(
+        get_past_context=lambda _ticker: "memory",
+        store_decision=lambda **_kwargs: events.append("memory-store"),
+    )
+    graph = SimpleNamespace(
+        config={"checkpoint_enabled": True, "data_cache_dir": "/tmp"},
+        workflow=workflow,
+        graph=stream_graph,
+        propagator=propagator,
+        memory_log=memory,
+        _resolve_pending_entries=lambda _ticker: events.append("memory-resolve"),
+        resolve_instrument_context=lambda _ticker, asset: f"instrument:{asset}",
+        _run_signature=lambda asset: f"shape:{asset}",
+        _log_state=lambda *_args: events.append("log-state"),
+        curr_state=None,
+        ticker=None,
+    )
+
+    chunks = list(TradingAgentsAdapter(graph).stream("BTC-USD", "2026-07-12"))
+    assert chunks[-1]["asset_type"] == "crypto"
+    assert ("compile", "saver") in events
+    assert "checkpoint-clear" in events
+    assert "checkpoint-exit" in events

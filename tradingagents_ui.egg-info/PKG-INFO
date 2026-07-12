@@ -5,4 +5,6 @@ Summary: Lightweight Streamlit UI for TradingAgents
 Requires-Python: >=3.10
 Requires-Dist: streamlit>=1.30.0
 Requires-Dist: python-dotenv>=1.0.0
-Requires-Dist: tradingagents@ git+https://github.com/TauricResearch/TradingAgents.git
+Requires-Dist: tradingagents @ git+https://github.com/TauricResearch/TradingAgents.git@v0.3.1
+Provides-Extra: bedrock
+Requires-Dist: langchain-aws>=1.5.0; extra == "bedrock"
