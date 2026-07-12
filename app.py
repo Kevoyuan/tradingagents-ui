@@ -608,6 +608,61 @@ def parse_saved_date(value: str | None) -> datetime.date:
         return datetime.date.today()
 
 
+def setup_path_for_desktop_app():
+    """Augment PATH environment variable for macOS desktop apps to find bun, npx, git, etc."""
+    if sys.platform not in ("darwin", "linux"):
+        return
+
+    current_paths = os.environ.get("PATH", "").split(os.pathsep)
+
+    # 1. Try to read PATH from user's interactive login shell to inherit user's shell config
+    try:
+        shell = os.environ.get("SHELL", "/bin/zsh" if sys.platform == "darwin" else "/bin/bash")
+        result = subprocess.run(
+            [shell, "-l", "-c", "echo $PATH"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=False,
+        )
+        if result.returncode == 0:
+            shell_paths = result.stdout.strip().split(os.pathsep)
+            for p in shell_paths:
+                p = p.strip()
+                if p and p not in current_paths:
+                    current_paths.append(p)
+    except Exception:
+        pass
+
+    # 2. Add common paths as fallback
+    common_paths = [
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+        str(Path.home() / ".bun" / "bin"),
+        str(Path.home() / ".local" / "bin"),
+    ]
+    # Check for NVM installed node versions
+    nvm_dir = Path.home() / ".nvm" / "versions" / "node"
+    if nvm_dir.exists():
+        try:
+            for node_ver in nvm_dir.iterdir():
+                bin_dir = node_ver / "bin"
+                if bin_dir.exists():
+                    common_paths.append(str(bin_dir))
+        except Exception:
+            pass
+
+    for p in common_paths:
+        if os.path.exists(p) and p not in current_paths:
+            current_paths.append(p)
+
+    os.environ["PATH"] = os.pathsep.join(current_paths)
+
+
+# Initialize PATH for desktop app environment immediately
+setup_path_for_desktop_app()
+
+
 def normalize_saved_analysts(values) -> list[str]:
     valid = {key for _, key in ANALYST_OPTIONS}
     selected = [value for value in values if value in valid] if isinstance(values, list) else []
@@ -616,11 +671,17 @@ def normalize_saved_analysts(values) -> list[str]:
 
 def get_bun_command() -> list[str]:
     """Return a Bun command suitable for the vendored baoyu markdown converter."""
+    setup_path_for_desktop_app()
     if shutil.which("bun"):
         return ["bun"]
     if shutil.which("npx"):
         return ["npx", "-y", "bun"]
-    raise RuntimeError("Generate HTML requires `bun` or `npx` to run the bundled markdown converter.")
+    raise RuntimeError(
+        "Generate HTML requires `bun` or `npx` to run the bundled markdown converter.\n"
+        "In the desktop app, please ensure you have Node.js or Bun installed on your system.\n"
+        "To install Bun, run: curl -fsSL https://bun.sh/install | bash\n"
+        "To install Node.js, download it from: https://nodejs.org/"
+    )
 
 
 def ensure_baoyu_dependencies():
@@ -1284,7 +1345,7 @@ def browse_reports_ui():
         created_time = datetime.datetime.fromtimestamp(created_ts)
         entries.append(
             {
-                "label": f"{parent}/{name}  —  {created_time.strftime('%Y-%m-%d %H:%M')}",
+                "label": f"{parent}/{name}  -  {created_time.strftime('%Y-%m-%d %H:%M')}",
                 "report_path": rf,
                 "sort_time": created_time,
             }
@@ -1349,40 +1410,69 @@ def browse_reports_ui():
 def render_sidebar_brand():
     update_status = cached_tradingagents_update_status()
     show_update_icon = should_show_tradingagents_update_icon(update_status)
-    brand_html = (
-        '<div style="padding:0.5rem 0 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);'
-        ' margin-bottom: 1.5rem;">'
-        '<div style="font-size:2.2rem;font-weight:800;color:var(--color-accent);letter-spacing:-0.03em;'
-        'line-height:1.1;text-shadow: 0 0 12px rgba(0,255,136,0.4);">TradingAgents</div>'
-        '<div style="font-size:0.75rem;color:var(--color-ink-faint);font-family:\'JetBrains Mono\',monospace;'
-        'opacity:0.8;margin-top:0.6rem;letter-spacing:0.05em;">'
-        'v1.2.0 &middot; INDUSTRIAL CONTROL PANEL</div></div>'
+    update_requested = False
+
+    logo_col, update_col = st.columns([0.8, 0.2], vertical_alignment="center")
+    with logo_col:
+        st.markdown(
+            '<div class="sidebar-brand-wordmark">TradingAgents</div>',
+            unsafe_allow_html=True,
+        )
+    with update_col:
+        if show_update_icon:
+            remote_tag = str(update_status.get("remote_tag", "the latest version"))
+            update_requested = st.button(
+                "Update TradingAgents",
+                key="tradingagents_update_icon",
+                help=f"Install TradingAgents {remote_tag}",
+                icon=":material/upgrade:",
+                disabled=bool(update_status.get("dirty")),
+            )
+
+    st.markdown(
+        '<div class="sidebar-brand-meta">v1.2.0 &middot; INDUSTRIAL CONTROL PANEL</div>'
+        '<div class="sidebar-brand-rule"></div>',
+        unsafe_allow_html=True,
     )
 
-    if not show_update_icon:
-        st.markdown(brand_html, unsafe_allow_html=True)
-        return
+    if update_requested:
+        remote_tag = str(update_status.get("remote_tag", "latest"))
+        with st.spinner(f"Installing TradingAgents {remote_tag}..."):
+            ok, message = update_tradingagents_from_app(update_status)
+        cached_tradingagents_update_status.clear()
+        st.session_state["_tradingagents_update_notice"] = {
+            "kind": "success" if ok else "error",
+            "title": "TradingAgents updated" if ok else "Update failed",
+            "message": message,
+        }
 
-    logo_col, update_col = st.columns([0.82, 0.18], vertical_alignment="top")
-    with logo_col:
-        st.markdown(brand_html, unsafe_allow_html=True)
-    with update_col:
-        st.markdown("<div style='height:0.42rem'></div>", unsafe_allow_html=True)
-        help_text = (
-            f"Update TradingAgents to {update_status.get('remote_tag', 'the latest GitHub version')}"
+    notice = st.session_state.get("_tradingagents_update_notice")
+    if isinstance(notice, dict):
+        kind = "success" if notice.get("kind") == "success" else "error"
+        title = html_lib.escape(str(notice.get("title", "Update status")))
+        message = html_lib.escape(str(notice.get("message", "")))
+        follow_up = (
+            "Restart the app to load the new TradingAgents version."
+            if kind == "success"
+            else "Check your network and Git configuration, then try again."
         )
-        can_update = not bool(update_status.get("dirty"))
-        if st.button("↥", key="tradingagents_update_icon", help=help_text, disabled=not can_update):
-            with st.spinner("Updating TradingAgents..."):
-                ok, message = update_tradingagents_from_app(update_status)
-            cached_tradingagents_update_status.clear()
-            if ok:
-                st.success(message)
-                st.caption("Restart the app to make sure loaded TradingAgents modules refresh.")
-            else:
-                st.error(message)
-        if update_status.get("dirty"):
-            st.caption("Local changes")
+        st.markdown(
+            f'<div class="update-notice update-notice-{kind}" role="status">'
+            f'<div class="update-notice-title">{title}</div>'
+            f'<div class="update-notice-message">{message}</div>'
+            f'<div class="update-notice-follow-up">{follow_up}</div>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+    elif show_update_icon and update_status.get("dirty"):
+        st.markdown(
+            '<div class="update-notice update-notice-warning" role="status">'
+            '<div class="update-notice-title">Update paused</div>'
+            '<div class="update-notice-message">The local TradingAgents checkout has uncommitted changes.</div>'
+            '<div class="update-notice-follow-up">Commit or stash them before updating.</div>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
 
 
 def render_sidebar():

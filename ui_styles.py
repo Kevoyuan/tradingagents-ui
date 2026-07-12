@@ -94,6 +94,90 @@ CUSTOM_CSS = """
     font-weight: 500;
 }
 
+/* Sidebar brand and update lifecycle */
+.sidebar-brand-wordmark {
+    color: var(--color-accent);
+    font-size: 1.75rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.035em;
+    white-space: nowrap;
+}
+.sidebar-brand-meta {
+    margin-top: 0.65rem;
+    color: var(--color-ink-faint);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    line-height: 1.55;
+    letter-spacing: 0.04em;
+}
+.sidebar-brand-rule {
+    height: 1px;
+    margin: 1.25rem 0 1.4rem;
+    background: var(--color-hairline-faint);
+}
+[data-testid="stSidebar"] .st-key-tradingagents_update_icon {
+    display: flex;
+    justify-content: flex-end;
+}
+[data-testid="stSidebar"] .st-key-tradingagents_update_icon button {
+    width: 2.5rem !important;
+    min-width: 2.5rem !important;
+    height: 2.5rem !important;
+    min-height: 2.5rem !important;
+    padding: 0 !important;
+    border-color: rgba(var(--color-accent-rgb), 0.28) !important;
+    color: var(--color-accent) !important;
+}
+[data-testid="stSidebar"] .st-key-tradingagents_update_icon button p {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+}
+[data-testid="stSidebar"] .st-key-tradingagents_update_icon button span {
+    margin: 0 !important;
+}
+.update-notice {
+    margin: -0.45rem 0 1.4rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--color-hairline-strong);
+    border-radius: 8px;
+    background: var(--color-surface-2);
+    box-shadow: inset 3px 0 0 var(--color-ink-subtle);
+}
+.update-notice-success {
+    border-color: rgba(var(--color-accent-rgb), 0.28);
+    box-shadow: inset 3px 0 0 var(--color-accent);
+}
+.update-notice-error {
+    border-color: rgba(var(--color-status-error-rgb), 0.35);
+    box-shadow: inset 3px 0 0 rgb(var(--color-status-error-rgb));
+}
+.update-notice-warning {
+    border-color: rgba(var(--color-status-in-progress-rgb), 0.35);
+    box-shadow: inset 3px 0 0 rgb(var(--color-status-in-progress-rgb));
+}
+.update-notice-title {
+    color: var(--color-ink-strong);
+    font-size: 0.82rem;
+    font-weight: 650;
+    line-height: 1.35;
+}
+.update-notice-message,
+.update-notice-follow-up {
+    margin-top: 0.38rem;
+    color: var(--color-ink-faint);
+    font-size: 0.75rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+.update-notice-follow-up {
+    color: var(--color-ink-default);
+}
+
 h1, h2, h3, h4, h5, h6 {
     letter-spacing: -0.02em !important; /* Linear negative tracking */
     color: var(--color-ink-strong) !important; /* Linear ink */
