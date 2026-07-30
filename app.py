@@ -882,8 +882,6 @@ def cached_generate_html_report(
 
 def render_open_html_button(html_report: str, key: str):
     """Render a browser-side button that opens the generated HTML in a new tab."""
-    import streamlit.components.v1 as components
-
     safe_html = json.dumps(html_report, ensure_ascii=False).replace("</script>", "<\\/script>")
     open_html = f"""
     <style>
@@ -928,14 +926,12 @@ def render_open_html_button(html_report: str, key: str):
         }};
     </script>
     """
-    components.html(open_html, height=48)
+    st.html(open_html)
 
 
 def render_inline_html(html: str, height: int, scrolling: bool = True):
     """Render inline HTML in a script-capable iframe."""
-    import streamlit.components.v1 as components
-
-    components.html(html, height=height, scrolling=scrolling)
+    st.html(html)
 
 
 def render_copy_markdown_button(report_content: str):
@@ -1018,9 +1014,7 @@ def render_copy_markdown_button(report_content: str):
         }};
     </script>
     """
-    import streamlit.components.v1 as components
-
-    components.html(copy_html, height=45)
+    st.html(copy_html)
 
 
 def render_report_with_nav(

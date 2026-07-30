@@ -2,7 +2,7 @@
 # Resolve or bootstrap the Python environment used by local launchers.
 
 : "${PROJECT_DIR:?PROJECT_DIR must be set before sourcing scripts/python-env.sh}"
-: "${PYTHON_VERSION:=${TRADINGAGENTS_UI_PYTHON_VERSION:-3.11}}"
+: "${PYTHON_VERSION:=${TRADINGAGENTS_UI_PYTHON_VERSION:-3.13}}"
 : "${LOG_FILE:=/dev/stderr}"
 
 log_python_env() {

@@ -11,5 +11,7 @@ tradingagents-promo/
 node_modules/
 .DS_Store
 *.app/
+*.app.previous*
+.TradingAgents UI.app.new.*
 build/
 dist/

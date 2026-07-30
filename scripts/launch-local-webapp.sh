@@ -2,10 +2,13 @@
 # Start TradingAgents UI in the background and open it in a standalone app window.
 set -euo pipefail
 
+# Unset global PYTHONPATH to avoid Hermes-Agent cli.py shadowing tradingagents' cli package.
+unset PYTHONPATH
+
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PORT="${TRADINGAGENTS_UI_PORT:-8501}"
 HOST="${TRADINGAGENTS_UI_HOST:-localhost}"
-PYTHON_VERSION="${TRADINGAGENTS_UI_PYTHON_VERSION:-3.11}"
+PYTHON_VERSION="${TRADINGAGENTS_UI_PYTHON_VERSION:-3.13}"
 URL="http://${HOST}:${PORT}"
 LOG_DIR="${HOME}/Library/Logs/tradingagents-ui"
 PID_FILE="${LOG_DIR}/streamlit.pid"
@@ -31,12 +34,21 @@ if ! port_is_listening; then
   echo "$!" >"${PID_FILE}"
 fi
 
+HEALTHY=false
 for _ in $(seq 1 60); do
   if server_is_healthy; then
+    HEALTHY=true
     break
   fi
   sleep 0.5
 done
+
+if [[ "${HEALTHY}" != true ]]; then
+  osascript \
+    -e 'display alert "TradingAgents UI could not start" message "Check ~/Library/Logs/tradingagents-ui/streamlit.log for details." as critical' \
+    >/dev/null 2>&1 || true
+  exit 1
+fi
 
 if [ -d "/Applications/Google Chrome.app" ]; then
   open -na "Google Chrome" --args --app="${URL}" --user-data-dir="${LOG_DIR}/chrome-profile"
