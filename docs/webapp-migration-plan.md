@@ -348,7 +348,8 @@ Scope notes added at P4 dispatch:
 
 Owned paths: `pyproject.toml`, `MANIFEST.in`, `.github/workflows/ci.yml`,
 `trade_ui/cli.py`, `scripts/wheel-smoke-test.sh`, `tradingagents_contract/**`,
-`COMPATIBILITY.md`, `README.md`, `docs/*`
+`COMPATIBILITY.md`, `README.md`, `docs/*`, `trade_ui/server/app.py` (CORS only),
+`app.py` (deprecation docstring only), `scripts/build-frontend.sh`, `.gitignore`
 
 Deliverable: static assets in the wheel, `trade-ui` serving the new app, `--legacy` serving
 Streamlit, the contract suite and CI job.
@@ -362,6 +363,19 @@ Carried over from P1 review (must be fixed here):
   entirely once the frontend is served same-origin.
 - Confirm the static-asset mount serves the SPA at `/` without shadowing the `/api` routes
   or the root `/health` probe the macOS launcher depends on.
+
+Frontend build wiring (decided at P5 dispatch):
+
+- Vite `build.outDir` becomes `../trade_ui/static`, and `trade_ui/static/**` is packaged into
+  the wheel as package data so `pip install` yields a working server with no Node present.
+- Add `scripts/build-frontend.sh` which installs deps and runs the Vite build. `python -m
+  build` does not run npm, so the frontend must be built first; CI does exactly that before
+  packaging, and `README.md` documents it.
+- `trade_ui/static/` is a build artifact and stays out of git (`.gitignore`).
+- If `trade_ui/static/index.html` is missing at startup, `trade-ui` must fail with a clear
+  message telling the user to run the frontend build, rather than serving an empty page.
+- `scripts/wheel-smoke-test.sh` must additionally assert that the built wheel actually
+  contains the static assets, so a packaging regression cannot ship silently.
 
 Acceptance (paste raw output):
 ```
