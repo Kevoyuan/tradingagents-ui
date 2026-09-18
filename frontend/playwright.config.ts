@@ -3,6 +3,11 @@ import path from 'path';
 import os from 'os';
 
 const testLogsDir = process.env.TRADINGAGENTS_LOGS_DIR || path.join(os.tmpdir(), 'tradingagents-playwright-logs');
+// Keep test runs out of the user's real ~/.tradingagents/runs history. Without
+// this the suite appends stub runs to the directory the app itself reads, so
+// every test run pollutes the user's run list and the Monitor auto-attaches to
+// the newest one.
+const testRunsDir = process.env.TRADINGAGENTS_RUNS_DIR || path.join(os.tmpdir(), 'tradingagents-playwright-runs');
 
 export default defineConfig({
   testDir: './tests',
@@ -27,7 +32,7 @@ export default defineConfig({
   webServer: [
     {
       command:
-        `TRADINGAGENTS_STUB=1 TRADINGAGENTS_LOGS_DIR="${testLogsDir}" ../.venv/bin/python -m uvicorn trade_ui.server.app:app --host 127.0.0.1 --port 8000`,
+        `TRADINGAGENTS_STUB=1 TRADINGAGENTS_LOGS_DIR="${testLogsDir}" TRADINGAGENTS_RUNS_DIR="${testRunsDir}" ../.venv/bin/python -m uvicorn trade_ui.server.app:app --host 127.0.0.1 --port 8000`,
       url: 'http://127.0.0.1:8000/health',
       reuseExistingServer: !process.env.CI,
       timeout: 30000,
