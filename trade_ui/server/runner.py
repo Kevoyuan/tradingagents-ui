@@ -172,7 +172,8 @@ class StubRunner:
                 )
 
             # 4. Research Team
-            for researcher in ["bull_researcher", "bear_researcher"]:
+            researchers = ["bull_researcher", "bear_researcher", "research_manager"]
+            for researcher in researchers:
                 if check_cancelled():
                     return
                 self.event_bus.publish(
@@ -181,12 +182,19 @@ class StubRunner:
                     team="research",
                     payload={"agent": researcher, "status": "running"},
                 )
+                if check_cancelled():
+                    return
+                researcher_text = (
+                    f"Synthesized research debate and consensus for {ticker}."
+                    if researcher == "research_manager"
+                    else f"Formulated {researcher.replace('_', ' ')} thesis for {ticker}."
+                )
                 self.event_bus.publish(
                     kind="agent_message",
                     agent=researcher,
                     team="research",
                     payload={
-                        "text": f"Formulated {researcher.replace('_', ' ')} thesis for {ticker}.",
+                        "text": researcher_text,
                         "model": self.config.deep_model or "stub-model",
                         "tokens_in": 180,
                         "tokens_out": 260,
@@ -194,6 +202,8 @@ class StubRunner:
                         "cost_usd": 0.0015,
                     },
                 )
+                if check_cancelled():
+                    return
                 self.event_bus.publish(
                     kind="agent_status",
                     agent=researcher,
@@ -210,6 +220,8 @@ class StubRunner:
                 team="trading",
                 payload={"agent": "trader", "status": "running"},
             )
+            if check_cancelled():
+                return
             self.event_bus.publish(
                 kind="agent_message",
                 agent="trader",
@@ -223,6 +235,8 @@ class StubRunner:
                     "cost_usd": 0.0012,
                 },
             )
+            if check_cancelled():
+                return
             self.event_bus.publish(
                 kind="agent_status",
                 agent="trader",
@@ -231,33 +245,39 @@ class StubRunner:
             )
 
             # 6. Risk Team
-            if check_cancelled():
-                return
-            self.event_bus.publish(
-                kind="agent_status",
-                agent="risk_manager",
-                team="risk",
-                payload={"agent": "risk_manager", "status": "running"},
-            )
-            self.event_bus.publish(
-                kind="agent_message",
-                agent="risk_manager",
-                team="risk",
-                payload={
-                    "text": "Risk assessment completed: 2-3% sizing, stop loss 110.0.",
-                    "model": self.config.quick_model or "stub-model",
-                    "tokens_in": 140,
-                    "tokens_out": 180,
-                    "latency_ms": 12,
-                    "cost_usd": 0.001,
-                },
-            )
-            self.event_bus.publish(
-                kind="agent_status",
-                agent="risk_manager",
-                team="risk",
-                payload={"agent": "risk_manager", "status": "done"},
-            )
+            risk_analysts = ["aggressive_analyst", "neutral_analyst", "conservative_analyst"]
+            for risk_agent in risk_analysts:
+                if check_cancelled():
+                    return
+                self.event_bus.publish(
+                    kind="agent_status",
+                    agent=risk_agent,
+                    team="risk",
+                    payload={"agent": risk_agent, "status": "running"},
+                )
+                if check_cancelled():
+                    return
+                self.event_bus.publish(
+                    kind="agent_message",
+                    agent=risk_agent,
+                    team="risk",
+                    payload={
+                        "text": f"Risk assessment from {risk_agent.replace('_', ' ')}: sizing and stop-loss validated.",
+                        "model": self.config.quick_model or "stub-model",
+                        "tokens_in": 140,
+                        "tokens_out": 180,
+                        "latency_ms": 12,
+                        "cost_usd": 0.001,
+                    },
+                )
+                if check_cancelled():
+                    return
+                self.event_bus.publish(
+                    kind="agent_status",
+                    agent=risk_agent,
+                    team="risk",
+                    payload={"agent": risk_agent, "status": "done"},
+                )
 
             # 7. Portfolio Manager Decision & Verdict
             if check_cancelled():
@@ -268,6 +288,8 @@ class StubRunner:
                 team="portfolio",
                 payload={"agent": "portfolio_manager", "status": "running"},
             )
+            if check_cancelled():
+                return
             self.event_bus.publish(
                 kind="agent_message",
                 agent="portfolio_manager",
@@ -281,6 +303,16 @@ class StubRunner:
                     "cost_usd": 0.002,
                 },
             )
+            if check_cancelled():
+                return
+            self.event_bus.publish(
+                kind="agent_status",
+                agent="portfolio_manager",
+                team="portfolio",
+                payload={"agent": "portfolio_manager", "status": "done"},
+            )
+            if check_cancelled():
+                return
 
             verdict_payload = {
                 "rating": "Buy",
@@ -299,20 +331,13 @@ class StubRunner:
             )
             self.header.verdict = verdict_payload
 
-            self.event_bus.publish(
-                kind="agent_status",
-                agent="portfolio_manager",
-                team="portfolio",
-                payload={"agent": "portfolio_manager", "status": "done"},
-            )
-
             # 8. Stats
             stats_payload = {
-                "llm_calls": 9,
+                "llm_calls": 12,
                 "tool_calls": len(analysts),
-                "tokens_in": 1400,
-                "tokens_out": 2100,
-                "cost_usd": 0.0125,
+                "tokens_in": 1900,
+                "tokens_out": 2700,
+                "cost_usd": 0.0165,
             }
             self.event_bus.publish(kind="stats", payload=stats_payload)
             self.header.stats = stats_payload
