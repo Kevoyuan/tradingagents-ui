@@ -317,6 +317,16 @@ Owned paths: `pyproject.toml`, `MANIFEST.in`, `.github/workflows/ci.yml`,
 Deliverable: static assets in the wheel, `trade-ui` serving the new app, `--legacy` serving
 Streamlit, the contract suite and CI job.
 
+Carried over from P1 review (must be fixed here):
+
+- `trade_ui/server/app.py` sets `allow_origins=["*"]` together with
+  `allow_credentials=True`. Browsers reject that combination, and a wildcard origin is
+  wrong for a local app anyway. Bind CORS to the actual localhost origins
+  (`http://localhost:<port>` / `http://127.0.0.1:<port>`) or drop the CORS middleware
+  entirely once the frontend is served same-origin.
+- Confirm the static-asset mount serves the SPA at `/` without shadowing the `/api` routes
+  or the root `/health` probe the macOS launcher depends on.
+
 Acceptance (paste raw output):
 ```
 unset PYTHONPATH && .venv/bin/python -m build
