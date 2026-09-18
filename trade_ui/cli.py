@@ -75,6 +75,21 @@ def create_ui_app(static_dir: Path | None = None) -> FastAPI:
     s_dir = static_dir or _get_static_dir()
 
     class SPAStaticFiles(StaticFiles):
+        async def __call__(self, scope, receive, send):
+            # This mount only ever serves files over HTTP. Starlette's
+            # StaticFiles.__call__ asserts scope["type"] == "http", which raises
+            # inside the request handler for any other scope. The realistic case
+            # is a websocket upgrade from a stale client that saw this port
+            # answer Streamlit's /_stcore/health probe and assumed a Streamlit
+            # server was listening. Refuse it cleanly instead of crashing.
+            if scope["type"] != "http":
+                if scope["type"] == "websocket":
+                    from starlette.websockets import WebSocket
+
+                    await WebSocket(scope, receive=receive, send=send).close(code=1000)
+                return
+            await super().__call__(scope, receive, send)
+
         async def get_response(self, path: str, scope):
             # Never let the static mount intercept /api routes
             if scope.get("path", "").startswith("/api"):
