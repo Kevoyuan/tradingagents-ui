@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>TradingAgents UI — Swiss Desk (merged A+C+D)</title>
+<!--
+Variant E · "Swiss Desk" · merge of A (editorial structure) + C (console rails) + D (live
+stream with the verdict kept in view), reinterpreted in a Swiss/International Typographic
+register at the user's request.
+
+1. Narrative role — the run's answer board. The user asked a question; twelve agents are
+   answering it. The single most important output is the action, so the action is set at
+   display scale, flush left, and never scrolls away.
+2. Viewer distance — 1m, large desk monitor. A strict two-column grid and tabular figures
+   hold up at that distance; the hierarchy comes from scale and weight rather than colour,
+   which is what lets one verdict word carry the whole screen.
+3. Visual temperature — formal and dispassionate. This is a financial artefact, so it
+   borrows the register of an annual report rather than a dashboard: paper white, hairline
+   rules, one signal colour that appears only where a recommendation is asserted.
+4. Capacity check — three 5s thumbnails: (a) masthead + verdict band, (b) stage rail + first
+   entries, (c) right rail with roster and burn. Fits: the verdict band is always visible,
+   the record scrolls beneath it, and the rail stays put.
+5. Visual motif — a Swiss bank's position sheet. A recommendation stated once, at size, with
+   its parameters in a tabular row beneath it, and the working papers kept to the side. That
+   is why the action word is the only thing on the page set larger than 30px, and why every
+   figure uses tabular numerals so the columns line up under each other.
+
+form comes from: the fact that this product exists to produce ONE decision from twelve
+opinions — so the decision is stated at display scale in a fixed band, and the twelve agents
+become the working papers in the record below it.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#ffffff;
+    --page:#f2f1ee;
+    --rule:#dcdad4;
+    --rule-2:#ebe9e4;
+    --ink:#0a0a0a;
+    --ink-2:#3d3a35;
+    --mut:#6e6a63;
+    --faint:#9c978e;
+    --buy:#0b6b3a;
+    --sell:#a8121f;
+    --hold:#545049;
+    --grotesk:Archivo,"Helvetica Neue",Helvetica,Arial,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--page);color:var(--ink);font-family:var(--grotesk);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  h1,h2,h3,p,dl,dd{margin:0}
+  .num{font-variant-numeric:tabular-nums}
+  .cap{font-size:12px;font-weight:600;letter-spacing:.13em;text-transform:uppercase}
+
+  .shell{display:grid;grid-template-columns:56px minmax(0,1fr)}
+
+  /* ── icon rail ───────────────────────────────────────────── */
+  .irail{position:sticky;top:0;height:100vh;background:var(--ink);display:flex;flex-direction:column;align-items:center;padding:16px 0;gap:4px}
+  .imark{width:24px;height:24px;display:flex;flex-direction:column;justify-content:center;gap:2.5px;margin-bottom:18px}
+  .imark i{display:block;height:2.5px;background:#fff}
+  .imark i:nth-child(1){width:100%}.imark i:nth-child(2){width:56%}.imark i:nth-child(3){width:80%}
+  .irail a{width:36px;height:36px;display:grid;place-items:center;color:#7c786f;text-decoration:none}
+  .irail a[aria-current]{color:#fff}
+
+  /* ── masthead ────────────────────────────────────────────── */
+  .main{background:var(--paper);min-height:100vh}
+  .mast{height:62px;display:flex;align-items:center;gap:26px;padding:0 40px;border-bottom:1px solid var(--ink)}
+  .wordmark{font-size:13px;font-weight:700;letter-spacing:.15em;text-transform:uppercase}
+  .nav{display:flex;gap:22px}
+  .nav a{font-size:12px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);text-decoration:none}
+  .nav a[aria-current]{color:var(--ink);font-weight:700}
+  .mid{margin-left:auto;display:flex;align-items:center;gap:24px}
+  .runid{text-align:right}
+  .runid .t{font-size:18px;font-weight:600;letter-spacing:-.015em}
+  .runid .s{font-size:12px;color:var(--mut);letter-spacing:.06em}
+  .clk{font-size:20px;font-weight:600;letter-spacing:-.02em}
+  .sbtn{font-family:var(--grotesk);font-size:12px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;background:transparent;border:1px solid var(--ink);color:var(--ink);padding:10px 18px;cursor:pointer}
+
+  /* ── verdict band ────────────────────────────────────────── */
+  .verdict{border-bottom:1px solid var(--ink);background:var(--paper)}
+  .vb-in{display:grid;grid-template-columns:auto 1px auto 1px 1fr;align-items:stretch;padding:0 40px}
+  .vb-l{padding:22px 44px 24px 0}
+  .vb-l .cap{color:var(--mut);display:flex;align-items:center;gap:9px}
+  .vb-l .cap i{width:6px;height:6px;background:var(--buy);display:block}
+  .action{font-size:76px;font-weight:600;letter-spacing:-.045em;line-height:.92;margin-top:10px;color:var(--buy)}
+  .vr{background:var(--rule)}
+  .vb-m{padding:24px 44px;display:flex;flex-direction:column;justify-content:center;gap:16px}
+  .figrow{display:flex;gap:46px}
+  .fig .k{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+  .fig .v{font-size:26px;font-weight:600;letter-spacing:-.025em;margin-top:5px}
+  .sub{font-size:13.5px;color:var(--mut);line-height:1.5;max-width:32ch}
+  .vb-r{padding:24px 0 24px 44px;display:flex;flex-direction:column;justify-content:center;gap:14px}
+  .nowrow{display:flex;align-items:baseline;gap:12px}
+  .nowrow .k{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+  .nowrow .v{font-size:15px;font-weight:600}
+  .prog{display:flex;gap:28px}
+  .prog .p .k{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+  .prog .p .v{font-size:17px;font-weight:600;margin-top:3px}
+
+  /* ── stage rail ──────────────────────────────────────────── */
+  .stages{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--rule);padding:0 40px}
+  .stg{display:flex;align-items:baseline;gap:10px;padding:13px 0;border-right:1px solid var(--rule-2);padding-left:18px}
+  .stg:first-child{padding-left:0}
+  .stg:last-child{border-right:0}
+  .stg .sq{width:9px;height:9px;background:transparent;border:1px solid var(--faint);flex:0 0 auto;align-self:center}
+  .stg .nm{font-size:12px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--faint)}
+  .stg .ct{font-size:13px;color:var(--faint);margin-left:auto;padding-right:18px}
+  .stg.done .sq{background:var(--mut);border-color:var(--mut)}
+  .stg.done .nm{color:var(--mut)}
+  .stg.now .sq{background:var(--ink);border-color:var(--ink)}
+  .stg.now .nm{color:var(--ink);font-weight:700}
+  .stg.now .ct{color:var(--ink);font-weight:600}
+
+  /* ── body ────────────────────────────────────────────────── */
+  .body{display:grid;grid-template-columns:minmax(0,1fr) 364px;gap:0}
+  .col-l{padding:30px 48px 80px 40px;border-right:1px solid var(--rule)}
+  .col-r{padding:30px 40px 80px 34px;background:var(--page)}
+  .col-r > * + *{margin-top:30px}
+
+  .sec{display:flex;align-items:baseline;gap:14px;padding-bottom:11px;border-bottom:1px solid var(--ink)}
+  .sec h2{font-size:12px;font-weight:700;letter-spacing:.15em;text-transform:uppercase}
+  .sec .n{margin-left:auto;font-size:13px;color:var(--mut);letter-spacing:.03em}
+
+  /* record */
+  .rec{margin-top:26px}
+  .e{padding:20px 0 22px;border-bottom:1px solid var(--rule)}
+  .e:first-child{border-top:1px solid var(--rule)}
+  .e-h{display:grid;grid-template-columns:66px 1fr;gap:20px;align-items:baseline}
+  .e-h .t{font-size:12.5px;color:var(--faint);letter-spacing:.04em}
+  .e-h .row{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .e-h .who{font-size:17px;font-weight:600;letter-spacing:-.015em}
+  .e-h .tag{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+  .e-h .tag.tool{color:var(--hold)}
+  .e-h .m{margin-left:auto;font-size:12.5px;color:var(--faint)}
+  .e-b{margin-top:11px}
+  .e-b p{font-size:15px;line-height:1.74;color:var(--ink-2);margin-bottom:11px}
+  .e-b p:last-child{margin-bottom:0}
+  .e-b p strong{color:var(--ink);font-weight:600}
+  .e-b .zh{line-height:1.92}
+  .evi{margin:13px 0 0 66px;border-left:1px solid var(--rule);padding-left:18px}
+  .evi-h{display:flex;align-items:baseline;gap:12px;margin-bottom:9px}
+  .evi-h .fn{font-family:var(--mono);font-size:13px;font-weight:500}
+  .evi-h .ok{font-size:12px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--buy)}
+  .evi-h .r{margin-left:auto;font-size:12.5px;color:var(--faint)}
+  dl.io{display:grid;grid-template-columns:50px 1fr;gap:6px 16px}
+  dl.io dt{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);padding-top:3px}
+  dl.io dd{font-family:var(--mono);font-size:12.5px;line-height:1.7;color:var(--ink-2);word-break:break-word}
+  pre.raw{margin:0;font-family:var(--mono);font-size:12.5px;line-height:1.72;color:var(--ink-2);white-space:pre-wrap;word-break:break-word}
+  .ex{margin-top:10px;font-size:12px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--ink);cursor:pointer;border-bottom:1px solid var(--ink);display:inline-block;padding-bottom:2px}
+
+  /* right rail */
+  .grp + .grp{margin-top:16px}
+  .grp-h{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);padding-bottom:7px;border-bottom:1px solid var(--rule)}
+  .grp ul{list-style:none;margin:0;padding:0}
+  .grp li{display:grid;grid-template-columns:18px 1fr auto;gap:12px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--rule-2)}
+  .mk{width:9px;height:9px;border:1px solid var(--faint);align-self:center}
+  li.done .mk{background:var(--faint);border-color:var(--faint)}
+  li.run .mk{background:var(--ink);border-color:var(--ink)}
+  .grp .nm{font-size:14.5px;color:var(--ink-2)}
+  li.run .nm{font-weight:700;color:var(--ink)}
+  li.pend .nm{color:var(--faint)}
+  .grp .t{font-size:12.5px;color:var(--faint)}
+
+  .burn .mr{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+  .burn .big{font-size:30px;font-weight:600;letter-spacing:-.03em}
+  .burn .u{font-size:13px;color:var(--mut)}
+  .burn .cost{margin-left:auto;text-align:right}
+  .burn .cost .v{font-size:22px;font-weight:600;letter-spacing:-.025em}
+  .burn .cost .k{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+  .axis{display:flex;justify-content:space-between;font-size:12px;color:var(--faint);margin-top:5px}
+  .lg{display:flex;gap:20px;margin-top:12px}
+  .lg span{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--mut)}
+  .lg i{width:16px;height:2px;display:block}
+
+  .stats{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--rule);border-left:1px solid var(--rule)}
+  .stats div{border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:11px 12px}
+  .stats .k{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+  .stats .v{font-size:19px;font-weight:600;letter-spacing:-.025em;margin-top:3px}
+  .foot{font-size:12.5px;line-height:1.65;color:var(--faint);border-top:1px solid var(--rule);padding-top:13px}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <nav class="irail">
+    <span class="imark"><i></i><i></i><i></i></span>
+    <a href="#" aria-current="page" title="Monitor"><svg width="16" height="16" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="3.5" width="15" height="10.5" stroke="currentColor" stroke-width="1.6"/><path d="M7 17h6M10 14v3" stroke="currentColor" stroke-width="1.6"/></svg></a>
+    <a href="#" title="Reports"><svg width="16" height="16" viewBox="0 0 20 20" fill="none"><path d="M5 2.6h6.4L15.5 6.7v10.7H5z" stroke="currentColor" stroke-width="1.6"/><path d="M7.4 10.4h5.6M7.4 13.2h4" stroke="currentColor" stroke-width="1.6"/></svg></a>
+    <a href="#" title="Settings"><svg width="16" height="16" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="2.6" stroke="currentColor" stroke-width="1.6"/><path d="M10 2.6v2.2M10 15.2v2.2M17.4 10h-2.2M4.8 10H2.6" stroke="currentColor" stroke-width="1.6"/></svg></a>
+  </nav>
+
+  <div class="main">
+
+    <header class="mast">
+      <span class="wordmark">TradingAgents</span>
+      <nav class="nav"><a href="#" aria-current="page">Monitor</a><a href="#">Reports</a><a href="#">Settings</a></nav>
+      <div class="mid">
+        <div class="runid"><div class="t">FORM</div><div class="s">2026-05-05 · RUN 7F3C2A</div></div>
+        <div class="clk num">07:20</div>
+        <button class="sbtn">Stop run</button>
+      </div>
+    </header>
+
+    <!-- verdict -->
+    <section class="verdict">
+      <div class="vb-in">
+        <div class="vb-l">
+          <div class="cap"><i></i>Trader plan · section 06 of 07</div>
+          <div class="action">BUY</div>
+        </div>
+        <div class="vr"></div>
+        <div class="vb-m">
+          <div class="figrow">
+            <div class="fig"><div class="k">Entry price</div><div class="v num">115.0</div></div>
+            <div class="fig"><div class="k">Stop loss</div><div class="v num">110.0</div></div>
+            <div class="fig"><div class="k">Position sizing</div><div class="v num">2–3%</div></div>
+          </div>
+          <p class="sub">FormFactor · AI semiconductor test · Q1 revenue +32% YoY, Q2 guidance ~$240M</p>
+        </div>
+        <div class="vr"></div>
+        <div class="vb-r">
+          <div class="nowrow"><span class="k">Now</span><span class="v">Aggressive Analyst · writing risk view</span></div>
+          <div class="prog">
+            <div class="p"><div class="k">Agents</div><div class="v num">8 / 12</div></div>
+            <div class="p"><div class="k">Reports</div><div class="v num">5 / 7</div></div>
+            <div class="p"><div class="k">Elapsed</div><div class="v num">07:20</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- stage rail -->
+    <div class="stages">
+      <span class="stg done"><span class="sq"></span><span class="nm">Analysts</span><span class="ct num">4/4</span></span>
+      <span class="stg done"><span class="sq"></span><span class="nm">Research</span><span class="ct num">3/3</span></span>
+      <span class="stg done"><span class="sq"></span><span class="nm">Trading</span><span class="ct num">1/1</span></span>
+      <span class="stg now"><span class="sq"></span><span class="nm">Risk</span><span class="ct num">1/3</span></span>
+      <span class="stg"><span class="sq"></span><span class="nm">Portfolio</span><span class="ct num">0/1</span></span>
+    </div>
+
+    <div class="body">
+
+      <div class="col-l">
+        <div class="sec"><h2>The record</h2><span class="n">142 entries · untruncated</span></div>
+
+        <div class="rec">
+
+          <article class="e">
+            <div class="e-h">
+              <span class="t num">09:47:25</span>
+              <span class="row"><span class="who">Market Analyst</span><span class="tag">Data</span><span class="m num">mimo-v2.5-pro · 1,842 tok · 1.2s</span></span>
+            </div>
+            <div class="e-b">
+              <div class="evi">
+                <div class="evi-h"><span class="fn">get_stock_data(FORM, 2026-04-01, 2026-05-05)</span><span class="ok">ok</span><span class="r num">2 sections</span></div>
+                <pre class="raw"># Cash Flow data for FORM (quarterly) # Data retrieved on: 2026-05-05
+
+Free Cash Flow,34662000.0,19486000.0,-47363000.0,49550000.0,28250000.0
+Capital Stock,-16588000.0,0.0,0.0,-16940000.0,0.0</pre>
+                <span class="ex">Expand full result · 14 rows</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="e">
+            <div class="e-h">
+              <span class="t num">09:47:26</span>
+              <span class="row"><span class="who">Market Analyst</span><span class="tag tool">Tool</span><span class="m num">1.24s</span></span>
+            </div>
+            <div class="e-b">
+              <div class="evi">
+                <div class="evi-h"><span class="fn">get_indicators</span><span class="ok">ok</span><span class="r num">1.24s</span></div>
+                <dl class="io">
+                  <dt>args</dt><dd>"rsi,macd,boll,atr", "2026-04-01", "2026-05-05"</dd>
+                  <dt>result</dt><dd>rsi 58.42 · macd 1.82 · boll_upper 121.6 · boll_lower 104.3 · atr 3.41<div style="color:var(--faint)">20 trading-day series collapsed</div></dd>
+                </dl>
+              </div>
+            </div>
+          </article>
+
+          <article class="e">
+            <div class="e-h">
+              <span class="t num">09:48:28</span>
+              <span class="row"><span class="who">Fundamentals Analyst</span><span class="tag">Agent</span><span class="m num">mimo-v2.5-pro · 4,318 tok · 12.6s</span></span>
+            </div>
+            <div class="e-b">
+              <p class="zh"><strong>报告日期：</strong>2026年5月5日　<strong>股票代码：</strong>FORM　<strong>公司名称：</strong>FormFactor, Inc.</p>
+              <p class="zh">FormFactor, Inc. 是一家领先的半导体测试解决方案供应商，专注于为半导体行业提供探针卡、探针系统和相关服务。公司属于科技板块下的<strong>半导体设备与材料</strong>行业，是全球半导体制造生态系统中不可或缺的一环。</p>
+              <p class="zh"><strong>核心业务：</strong>本公司设计、开发、制造、销售和支持用于半导体器件电气测试的高性能探针卡和操作系统。主要客户覆盖晶圆代工、IDM 与封测厂。</p>
+              <span class="ex">Expand 6 paragraphs</span>
+            </div>
+          </article>
+
+          <article class="e">
+            <div class="e-h">
+              <span class="t num">09:50:37</span>
+              <span class="row"><span class="who">You</span><span class="tag">User</span></span>
+            </div>
+            <div class="e-b"><p>Continue</p></div>
+          </article>
+
+          <article class="e">
+            <div class="e-h">
+              <span class="t num">09:50:37</span>
+              <span class="row"><span class="who">Trader</span><span class="tag">Agent</span><span class="m num">mimo-v2.5-pro · 3,905 tok · 9.4s</span></span>
+            </div>
+            <div class="e-b">
+              <p><strong>Action: Buy.</strong> FormFactor 是结构性的 AI 半导体赢家，Q1 收入创纪录（同比 +32%），Q2 指引加速（约 2.4 亿美元），在高端探针卡领域处于领先地位。长期趋势完好（价格 &gt; 50 日均线 &gt; 200 日均线）；前瞻 P/E 约 40，配合 PEG 1.39，风险回报比尚可。若放量跌破 110，该论点失效，应减仓。</p>
+            </div>
+          </article>
+
+          <article class="e" style="border-bottom:0">
+            <div class="e-h">
+              <span class="t">—</span>
+              <span class="row"><span class="who">Aggressive Analyst</span><span class="tag">Agent</span><span class="m">streaming…</span></span>
+            </div>
+          </article>
+
+        </div>
+      </div>
+
+      <aside class="col-r">
+
+        <section>
+          <div class="sec"><h2>Who is speaking</h2><span class="n">8 / 12</span></div>
+          <div style="margin-top:14px">
+            <div class="grp">
+              <div class="grp-h">Analyst Team · 4 / 4</div>
+              <ul>
+                <li class="done"><span class="mk"></span><span class="nm">Market Analyst</span><span class="t num">18.4k</span></li>
+                <li class="done"><span class="mk"></span><span class="nm">Social Analyst</span><span class="t num">12.1k</span></li>
+                <li class="done"><span class="mk"></span><span class="nm">News Analyst</span><span class="t num">15.7k</span></li>
+                <li class="done"><span class="mk"></span><span class="nm">Fundamentals Analyst</span><span class="t num">22.8k</span></li>
+              </ul>
+            </div>
+            <div class="grp">
+              <div class="grp-h">Research Team · 3 / 3</div>
+              <ul>
+                <li class="done"><span class="mk"></span><span class="nm">Bull Researcher</span><span class="t num">9.3k</span></li>
+                <li class="done"><span class="mk"></span><span class="nm">Bear Researcher</span><span class="t num">11.6k</span></li>
+                <li class="done"><span class="mk"></span><span class="nm">Research Manager</span><span class="t num">7.4k</span></li>
+              </ul>
+            </div>
+            <div class="grp">
+              <div class="grp-h">Trading Team · 1 / 1</div>
+              <ul><li class="done"><span class="mk"></span><span class="nm">Trader</span><span class="t num">3.9k</span></li></ul>
+            </div>
+            <div class="grp">
+              <div class="grp-h">Risk Management · 0 / 3</div>
+              <ul>
+                <li class="run"><span class="mk"></span><span class="nm">Aggressive Analyst</span><span class="t num">2.1k</span></li>
+                <li class="pend"><span class="mk"></span><span class="nm">Neutral Analyst</span><span class="t">queued</span></li>
+                <li class="pend"><span class="mk"></span><span class="nm">Conservative Analyst</span><span class="t">queued</span></li>
+              </ul>
+            </div>
+            <div class="grp">
+              <div class="grp-h">Portfolio · 0 / 1</div>
+              <ul><li class="pend"><span class="mk"></span><span class="nm">Portfolio Manager</span><span class="t">queued</span></li></ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="burn">
+          <div class="sec"><h2>Token burn</h2><span class="n">by elapsed time</span></div>
+          <div style="margin-top:16px">
+            <div class="mr">
+              <span class="big num">208.0k</span><span class="u">tokens</span>
+              <span class="cost"><span class="k">Est. cost</span><div class="v num">$0.042</div></span>
+            </div>
+            <svg width="100%" height="118" viewBox="0 0 364 118" preserveAspectRatio="none" role="img" aria-label="Token burn across elapsed time">
+              <line x1="0" y1="96" x2="364" y2="96" stroke="#dcdad4"/>
+              <line x1="0" y1="62" x2="364" y2="62" stroke="#ebe9e4"/>
+              <line x1="0" y1="28" x2="364" y2="28" stroke="#ebe9e4"/>
+              <polygon fill="rgba(10,10,10,.10)" points="0,92 36,88 72,84 109,76 145,70 182,62 218,55 255,47 291,41 328,35 364,30 364,96 0,96"/>
+              <polyline fill="none" stroke="#0a0a0a" stroke-width="1.6" points="0,92 36,88 72,84 109,76 145,70 182,62 218,55 255,47 291,41 328,35 364,30"/>
+              <polyline fill="none" stroke="#9c978e" stroke-width="1.4" stroke-dasharray="4 3" points="0,95 36,94.5 72,94 109,93.4 145,92.8 182,92 218,91.3 255,90.4 291,89.6 328,88.8 364,88"/>
+              <line x1="109" y1="0" x2="109" y2="96" stroke="#dcdad4" stroke-dasharray="2 3"/>
+              <line x1="218" y1="0" x2="218" y2="96" stroke="#dcdad4" stroke-dasharray="2 3"/>
+              <line x1="291" y1="0" x2="291" y2="96" stroke="#dcdad4" stroke-dasharray="2 3"/>
+            </svg>
+            <div class="axis num"><span>00:00</span><span>01:50</span><span>03:40</span><span>05:30</span><span>07:20</span></div>
+            <div class="lg">
+              <span><i style="background:#0a0a0a"></i>input 187.0k</span>
+              <span><i style="background:#9c978e"></i>output 21.0k</span>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <div class="sec"><h2>Run</h2><span class="n">mimo_tokenplan</span></div>
+          <div class="stats">
+            <div><div class="k">LLM calls</div><div class="v num">22</div></div>
+            <div><div class="k">Tool calls</div><div class="v num">17</div></div>
+            <div><div class="k">Tokens in</div><div class="v num">187.0k</div></div>
+            <div><div class="k">Tokens out</div><div class="v num">21.0k</div></div>
+            <div><div class="k">Reports</div><div class="v num">5 / 7</div></div>
+            <div><div class="k">Elapsed</div><div class="v num">07:20</div></div>
+          </div>
+        </section>
+
+        <p class="foot">Refreshing this page does not interrupt the run. Reopening reconnects to the live stream and backfills anything missed.</p>
+      </aside>
+
+    </div>
+  </div>
+</div>
+</body>
+</html>
