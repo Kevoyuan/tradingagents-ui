@@ -6,6 +6,8 @@ import { StageRail } from './components/StageRail';
 import { TheRecord } from './components/TheRecord';
 import { RightRail } from './components/RightRail';
 import { RunLauncherModal } from './components/RunLauncherModal';
+import { ReportsIndexScreen } from './components/ReportsIndexScreen';
+import { ReportDetailScreen } from './components/ReportDetailScreen';
 import { useRun } from './hooks/useRun';
 import { useRunEvents } from './hooks/useRunEvents';
 import { AgentInfo, AgentStatus, StageInfo, TeamName, Verdict } from './types';
@@ -27,6 +29,21 @@ const INITIAL_ROSTER: { slug: string; name: string; team: TeamName }[] = [
 ];
 
 export const App: React.FC = () => {
+  const [currentPath, setCurrentPath] = useState<string>(() => window.location.pathname);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigate = (to: string) => {
+    window.history.pushState({}, '', to);
+    setCurrentPath(to);
+  };
+
   const { runId, header, startRun, cancelRun, applyHeaderUpdate } = useRun();
   const isRunActive = header?.status === 'running' || header?.status === 'pending';
   const { events } = useRunEvents(runId, isRunActive);
@@ -213,64 +230,83 @@ export const App: React.FC = () => {
   const currentVerdict = liveVerdict || header?.verdict || null;
   const agentsDone = roster.filter((a) => a.status === 'done').length;
 
+  const reportMatch = currentPath.match(/^\/reports\/([^/]+)\/([^/]+)/);
+  const isReportsIndex = currentPath === '/reports' || currentPath === '/reports/';
+
   return (
     <div className="grid grid-cols-[56px_minmax(0,1fr)] min-h-screen bg-page font-grotesk antialiased">
       {/* 56px icon rail */}
-      <IconRail />
+      <IconRail currentPath={currentPath} onNavigate={navigate} />
 
-      {/* Main container */}
-      <div className="bg-paper min-h-screen flex flex-col">
-        {/* Masthead */}
-        <Masthead
-          header={header}
-          elapsedFormatted={elapsedFormatted}
-          onStop={cancelRun}
-          onNewRun={() => setIsLauncherOpen(true)}
-        />
-
-        {/* Persistent verdict band */}
-        <VerdictBand
-          verdict={currentVerdict}
-          runStatus={header?.status}
-          activeAgent={activeAgentName}
-          activeActivity={activeAgentInfo?.activity || 'analyzing signals'}
-          agentsDone={agentsDone}
-          totalAgents={roster.length}
-          reportsDone={reportsCount}
-          totalReports={7}
-          elapsedFormatted={elapsedFormatted}
-        />
-
-        {/* Five-stage linear rail */}
-        <StageRail stages={stages} />
-
-        {/* Main body split */}
-        <div className="grid grid-cols-[minmax(0,1fr)_364px] grow">
-          {/* Left column: The record */}
-          <TheRecord events={events} />
-
-          {/* Right column: Right rail */}
-          <RightRail
-            agents={roster}
-            stats={header?.stats}
+      {/* Screen container */}
+      {reportMatch ? (
+        <div className="bg-paper min-h-screen flex flex-col">
+          <ReportDetailScreen
+            ticker={decodeURIComponent(reportMatch[1])}
+            date={decodeURIComponent(reportMatch[2])}
+            onNavigate={navigate}
+          />
+        </div>
+      ) : isReportsIndex ? (
+        <div className="bg-paper min-h-screen flex flex-col">
+          <ReportsIndexScreen onNavigate={navigate} />
+        </div>
+      ) : (
+        <div className="bg-paper min-h-screen flex flex-col">
+          {/* Masthead */}
+          <Masthead
             header={header}
+            elapsedFormatted={elapsedFormatted}
+            onStop={cancelRun}
+            onNewRun={() => setIsLauncherOpen(true)}
+            currentPath={currentPath}
+            onNavigate={navigate}
+          />
+
+          {/* Persistent verdict band */}
+          <VerdictBand
+            verdict={currentVerdict}
+            runStatus={header?.status}
+            activeAgent={activeAgentName}
+            activeActivity={activeAgentInfo?.activity || 'analyzing signals'}
+            agentsDone={agentsDone}
+            totalAgents={roster.length}
             reportsDone={reportsCount}
             totalReports={7}
             elapsedFormatted={elapsedFormatted}
-            tokenHistory={tokenHistory}
+          />
+
+          {/* Five-stage linear rail */}
+          <StageRail stages={stages} />
+
+          {/* Main body split */}
+          <div className="grid grid-cols-[minmax(0,1fr)_364px] grow">
+            {/* Left column: The record */}
+            <TheRecord events={events} />
+
+            {/* Right column: Right rail */}
+            <RightRail
+              agents={roster}
+              stats={header?.stats}
+              header={header}
+              reportsDone={reportsCount}
+              totalReports={7}
+              elapsedFormatted={elapsedFormatted}
+              tokenHistory={tokenHistory}
+            />
+          </div>
+
+          {/* Launcher modal */}
+          <RunLauncherModal
+            isOpen={isLauncherOpen}
+            onClose={() => setIsLauncherOpen(false)}
+            onStart={async (params) => {
+              await startRun(params);
+            }}
+            isLoading={false}
           />
         </div>
-      </div>
-
-      {/* Launcher modal */}
-      <RunLauncherModal
-        isOpen={isLauncherOpen}
-        onClose={() => setIsLauncherOpen(false)}
-        onStart={async (params) => {
-          await startRun(params);
-        }}
-        isLoading={false}
-      />
+      )}
     </div>
   );
 };

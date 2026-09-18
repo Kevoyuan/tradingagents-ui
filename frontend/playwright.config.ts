@@ -1,4 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
+import path from 'path';
+import os from 'os';
+
+const testLogsDir = process.env.TRADINGAGENTS_LOGS_DIR || path.join(os.tmpdir(), 'tradingagents-playwright-logs');
 
 export default defineConfig({
   testDir: './tests',
@@ -23,7 +27,7 @@ export default defineConfig({
   webServer: [
     {
       command:
-        'TRADINGAGENTS_STUB=1 ../.venv/bin/python -m uvicorn trade_ui.server.app:app --host 127.0.0.1 --port 8000',
+        `TRADINGAGENTS_STUB=1 TRADINGAGENTS_LOGS_DIR="${testLogsDir}" ../.venv/bin/python -m uvicorn trade_ui.server.app:app --host 127.0.0.1 --port 8000`,
       url: 'http://127.0.0.1:8000/health',
       reuseExistingServer: !process.env.CI,
       timeout: 30000,

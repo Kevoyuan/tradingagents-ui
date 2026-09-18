@@ -1,6 +1,14 @@
 import React from 'react';
 
-export const IconRail: React.FC = () => {
+interface IconRailProps {
+  currentPath?: string;
+  onNavigate?: (path: string) => void;
+}
+
+export const IconRail: React.FC<IconRailProps> = ({ currentPath = '/', onNavigate }) => {
+  const isReports = currentPath.startsWith('/reports');
+  const isMonitor = !isReports;
+
   return (
     <nav
       className="sticky top-0 h-screen w-14 bg-ink flex flex-col items-center py-4 gap-1 z-40 select-none"
@@ -15,10 +23,19 @@ export const IconRail: React.FC = () => {
 
       {/* Monitor Icon */}
       <a
-        href="#"
-        aria-current="page"
+        href="/"
+        aria-current={isMonitor ? 'page' : undefined}
         title="Monitor"
-        className="w-9 h-9 grid place-items-center text-white hover:text-white"
+        onClick={(e) => {
+          if (onNavigate) {
+            e.preventDefault();
+            onNavigate('/');
+          }
+        }}
+        className={`w-9 h-9 grid place-items-center transition-colors ${
+          isMonitor ? 'text-white' : 'text-[#7c786f] hover:text-white'
+        }`}
+        data-testid="nav-monitor"
       >
         <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6">
           <rect x="2.5" y="3.5" width="15" height="10.5" />
@@ -28,9 +45,19 @@ export const IconRail: React.FC = () => {
 
       {/* Reports Icon */}
       <a
-        href="#"
+        href="/reports"
+        aria-current={isReports ? 'page' : undefined}
         title="Reports"
-        className="w-9 h-9 grid place-items-center text-[#7c786f] hover:text-white transition-colors"
+        onClick={(e) => {
+          if (onNavigate) {
+            e.preventDefault();
+            onNavigate('/reports');
+          }
+        }}
+        className={`w-9 h-9 grid place-items-center transition-colors ${
+          isReports ? 'text-white' : 'text-[#7c786f] hover:text-white'
+        }`}
+        data-testid="nav-reports"
       >
         <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6">
           <path d="M5 2.6h6.4L15.5 6.7v10.7H5z" />

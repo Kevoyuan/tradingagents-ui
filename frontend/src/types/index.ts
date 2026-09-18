@@ -93,3 +93,38 @@ export interface ToolEvidenceItem {
   truncated?: boolean;
   full_ref?: string | null;
 }
+
+export interface AgentBlock {
+  name: string;
+  slug: string;
+  markdown: string;
+  complete: boolean;
+}
+
+export interface ReportSection {
+  title: string;
+  slug: string;
+  blocks: AgentBlock[];
+}
+
+export interface ReportSummary {
+  ticker: string;
+  trade_date: string;
+  path: string;
+  verdict?: Verdict | null;
+  sections_count: number;
+}
+
+export interface ReportDetail {
+  ticker: string;
+  trade_date: string;
+  verdict?: Verdict | null;
+  sections: ReportSection[];
+}
+
+export type ExportState = 'idle' | 'running' | 'ready' | 'failed';
+
+export interface ExportStatus {
+  state: ExportState;
+  error?: string | null;
+}

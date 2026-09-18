@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, StreamingResponse
 
+from trade_ui.report_index import (
+    ReportSummary,
+    extract_verdict,
+    list_reports,
+    load_report_sections,
+)
+from trade_ui.server.export import export_manager, resolve_report_dir
 from trade_ui.server.models import RunConfig, RunHeader
 from trade_ui.server.registry import (
     RunConflictError,
@@ -134,3 +143,95 @@ def get_tool_result(run_id: str, call_id: str, request: Request) -> PlainTextRes
     with open(tool_file, encoding="utf-8") as f:
         content = f.read()
     return PlainTextResponse(content)
+
+
+def get_logs_dir(request: Request) -> Path:
+    """Retrieve logs directory from request headers, environment, or app settings."""
+    header_dir = request.headers.get("X-TradingAgents-Logs-Dir")
+    if header_dir:
+        return Path(header_dir).expanduser().resolve()
+    env_logs = os.environ.get("TRADINGAGENTS_LOGS_DIR")
+    if env_logs:
+        return Path(env_logs).expanduser().resolve()
+    settings = getattr(request.app.state, "settings", None)
+    if settings and hasattr(settings, "logs_dir"):
+        return settings.logs_dir
+    return (Path.home() / ".tradingagents" / "logs").resolve()
+
+
+@router.get("/reports")
+def get_reports_index(request: Request) -> list[ReportSummary]:
+    """List historical reports index from logs directory."""
+    logs_dir = get_logs_dir(request)
+    return list_reports(logs_dir=logs_dir)
+
+
+@router.get("/reports/{ticker}/{date}")
+def get_report_detail(ticker: str, date: str, request: Request) -> dict[str, Any]:
+    """Get report sections and verdict for a specific ticker and trade date."""
+    logs_dir = get_logs_dir(request)
+    rep_dir = resolve_report_dir(logs_dir, ticker, date)
+    if not rep_dir.is_dir():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Report for {ticker} on {date} not found",
+        )
+    sections = load_report_sections(rep_dir)
+    verdict = extract_verdict(rep_dir)
+    if not sections and verdict is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Report for {ticker} on {date} not found or empty",
+        )
+    return {
+        "ticker": ticker,
+        "trade_date": date,
+        "verdict": verdict,
+        "sections": sections,
+    }
+
+
+@router.post("/reports/{ticker}/{date}/export", status_code=status.HTTP_202_ACCEPTED)
+def trigger_report_export(ticker: str, date: str, request: Request) -> dict[str, Any]:
+    """Start off-thread report HTML export. Returns 202 Accepted."""
+    logs_dir = get_logs_dir(request)
+    rep_dir = resolve_report_dir(logs_dir, ticker, date)
+    if not rep_dir.is_dir():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Report for {ticker} on {date} not found",
+        )
+    export_manager.start_export(rep_dir, ticker, date)
+    return {"status": "accepted", "state": "running", "ticker": ticker, "trade_date": date}
+
+
+@router.get("/reports/{ticker}/{date}/export")
+def get_cached_report_export(ticker: str, date: str, request: Request) -> HTMLResponse:
+    """Return cached report export HTML or 404 if not yet generated."""
+    logs_dir = get_logs_dir(request)
+    rep_dir = resolve_report_dir(logs_dir, ticker, date)
+    if not rep_dir.is_dir():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Report for {ticker} on {date} not found",
+        )
+    html_content = export_manager.get_cached_html(rep_dir)
+    if html_content is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Export HTML for {ticker} on {date} not found or not ready",
+        )
+    return HTMLResponse(content=html_content, media_type="text/html; charset=utf-8")
+
+
+@router.get("/reports/{ticker}/{date}/export/status")
+def get_report_export_status(ticker: str, date: str, request: Request) -> dict[str, Any]:
+    """Return export state: idle | running | ready | failed."""
+    logs_dir = get_logs_dir(request)
+    rep_dir = resolve_report_dir(logs_dir, ticker, date)
+    if not rep_dir.is_dir():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Report for {ticker} on {date} not found",
+        )
+    return export_manager.get_status(rep_dir)

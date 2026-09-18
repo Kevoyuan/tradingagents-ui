@@ -6,6 +6,8 @@ interface MastheadProps {
   elapsedFormatted: string;
   onStop: () => void;
   onNewRun: () => void;
+  currentPath?: string;
+  onNavigate?: (path: string) => void;
 }
 
 export const Masthead: React.FC<MastheadProps> = ({
@@ -13,11 +15,14 @@ export const Masthead: React.FC<MastheadProps> = ({
   elapsedFormatted,
   onStop,
   onNewRun,
+  currentPath = '/',
+  onNavigate,
 }) => {
   const isRunning = header?.status === 'running' || header?.status === 'pending';
   const ticker = header?.ticker || '—';
   const tradeDate = header?.trade_date || '—';
   const runId = header?.run_id ? `RUN ${header.run_id.slice(0, 8).toUpperCase()}` : 'NO ACTIVE RUN';
+  const isReports = currentPath.startsWith('/reports');
 
   return (
     <header className="h-[62px] flex items-center gap-6 px-10 border-b border-ink bg-paper select-none sticky top-0 z-30">
@@ -29,15 +34,32 @@ export const Masthead: React.FC<MastheadProps> = ({
       {/* Nav */}
       <nav className="flex gap-5" aria-label="Main Navigation">
         <a
-          href="#"
-          aria-current="page"
-          className="text-xs font-bold tracking-[0.13em] uppercase text-ink no-underline"
+          href="/"
+          aria-current={!isReports ? 'page' : undefined}
+          onClick={(e) => {
+            if (onNavigate) {
+              e.preventDefault();
+              onNavigate('/');
+            }
+          }}
+          className={`text-xs tracking-[0.13em] uppercase no-underline transition-colors ${
+            !isReports ? 'font-bold text-ink' : 'font-medium text-faint hover:text-ink'
+          }`}
         >
           Monitor
         </a>
         <a
-          href="#"
-          className="text-xs font-medium tracking-[0.13em] uppercase text-faint no-underline hover:text-ink transition-colors"
+          href="/reports"
+          aria-current={isReports ? 'page' : undefined}
+          onClick={(e) => {
+            if (onNavigate) {
+              e.preventDefault();
+              onNavigate('/reports');
+            }
+          }}
+          className={`text-xs tracking-[0.13em] uppercase no-underline transition-colors ${
+            isReports ? 'font-bold text-ink' : 'font-medium text-faint hover:text-ink'
+          }`}
         >
           Reports
         </a>
