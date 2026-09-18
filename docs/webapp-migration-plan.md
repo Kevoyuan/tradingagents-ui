@@ -307,7 +307,8 @@ Three Playwright cases required: happy path, reload-and-reconnect, Stop cancels.
 ### P4 — Report screen + export endpoint
 
 Owned paths: `frontend/**` (Report screen only), `trade_ui/server/export.py`,
-`tests/server/test_export.py`
+`trade_ui/server/api.py` (report routes only), `tests/server/test_export.py`,
+`tests/server/test_reports_api.py`
 
 Deliverable: the two-level TOC, collapsible agent blocks, the verdict card, and the export
 endpoint of §6 with three UI states.
@@ -319,6 +320,29 @@ cd frontend && npx playwright test report
 ```
 Required: opening the NBIS report in the UI shows **Underweight**, and the TOC two levels
 resolve correctly despite the agent files' own H1/H2/H3.
+
+Scope notes added at P4 dispatch:
+
+- P1 only built the runs routes. P4 must add the report routes from §5 —
+  `GET /api/reports` and `GET /api/reports/{ticker}/{date}` — delegating to
+  `trade_ui/report_index.py` from P2. Do not reimplement parsing.
+- The report screen needs a routing path in the frontend. Use `/reports` for the index and
+  `/reports/:ticker/:date` for a specific report; keep it lightweight, no router overhaul.
+- **Testability:** the report reader currently hardcodes `~/.tradingagents/logs`, which means
+  the Playwright report test can only pass on a machine that already has real reports. Add a
+  `TRADINGAGENTS_LOGS_DIR` environment override, mirroring the existing
+  `TRADINGAGENTS_RUNS_DIR` in `trade_ui/server/config.py`. The Playwright test must point it
+  at a temporary directory containing a synthetic report that encodes the BUY/SELL/
+  Underweight trap, so the test asserts Underweight and runs anywhere.
+- **Do not import `app.py` from `export.py`.** `app.py` imports Streamlit and is on its way
+  out; importing it would drag the legacy UI into the server process. Resolve the vendored
+  converter script relative to the project root and shell out to it the same way
+  (`bun main.ts <md> --theme quant-terminal --keep-title`, with `--qt-ticker/--qt-date/
+  --qt-model`). Duplicate the `HTML_REPORT_THEME_VERSION` value in `export.py` with a comment
+  that it must match `app.py` while the legacy UI remains; P5 removes the duplication when
+  `app.py` is deprecated.
+- Export must be non-blocking: `POST .../export` returns 202 and the work happens off the
+  request thread. `GET .../export/status` reports `idle|running|ready|failed`.
 
 ### P5 — Packaging, `--legacy`, CI contract job
 
