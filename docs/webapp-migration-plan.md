@@ -387,6 +387,86 @@ Plus: `trade-ui --help` documents both modes.
 
 ## 11. Stop conditions
 
+### P6 — Settings, providers and credentials (added after P5 review)
+
+**Why this phase exists.** P1-P5 shipped a Monitor and a Reports screen but no way to
+configure a run. §5 listed `GET /api/providers`, `GET|PUT /api/credentials` and
+`GET /api/upstream`, and §7 listed a Settings screen, but no phase owned them. The frontend
+never called those endpoints, so every test passed while the product could not start a real
+analysis. Concretely: `RunConfig.config` arrives as `{}`, the runner builds
+`TradingAgentsGraph(analysts, config={})`, and upstream `DEFAULT_CONFIG` then supplies
+`llm_provider: openai`, `quick_think_llm: gpt-5.4-mini`, `deep_think_llm: gpt-5.5`. The
+server never reads `~/.tradingagents/.env`, and `find_dotenv(usecwd=True)` does not find it
+either, so a real run fails on auth while silently ignoring the user's chosen provider.
+
+The user's existing configuration is intact and must be reused, not re-created:
+`~/.tradingagents/ui_preferences.json` (`ticker`, `output_language`, `analysts`,
+`llm_provider`, `quick_think_llm`, `deep_think_llm`, `depth_key`, `data_vendors`,
+`advanced_settings`, `provider_model_profiles`) and `~/.tradingagents/.env` (all provider
+keys and base URLs). Verified on disk. Read them; do not migrate or rewrite them.
+
+Owned paths: `trade_ui/server/providers.py`, `trade_ui/server/credentials.py`,
+`trade_ui/server/run_config.py`, `trade_ui/server/api.py` (settings routes only),
+`trade_ui/server/runner.py` (config wiring only), `frontend/**` (Settings screen and run
+launcher only), `tests/server/test_providers_api.py`, `tests/server/test_credentials.py`,
+`tests/server/test_run_config.py`
+
+Deliverables:
+
+1. `GET /api/providers` returning the catalog from `ui_config` (PROVIDERS,
+   PROVIDER_MODEL_OPTIONS, upstream MODEL_OPTIONS, PROVIDER_API_KEY_ENV,
+   PROVIDER_BASE_URL_ENV, AZURE_ENV_FIELDS, BEDROCK_ENV_FIELDS, DEPTH_OPTIONS, LANGUAGES,
+   ANALYST_OPTIONS) plus which credential env vars each provider needs and which are optional.
+2. `GET /api/credentials` returning persisted values with secrets REDACTED (never return a
+   key value; return whether it is set and a masked hint). `PUT /api/credentials` writing
+   `~/.tradingagents/.env` via the existing `preferences.py` / dotenv helpers, preserving
+   unrelated keys already in that file. Local mode only.
+3. `GET /api/upstream` reproducing `cached_tradingagents_update_status` WITHOUT importing
+   `app.py` (it imports Streamlit). Use `tradingagents_compat` plus the same
+   `git ls-remote --tags` approach, cached for an hour.
+4. `trade_ui/server/run_config.py`: the mapping the old UI has and the server currently
+   lacks, mirroring `get_runtime_llm_config` / `missing_required_credentials` /
+   `get_effective_api_env_values` in `app.py`. It resolves provider to runtime provider and
+   base URL, assembles the upstream `config` dict (`quick_think_llm`, `deep_think_llm`,
+   `backend_url`, `llm_provider`, `max_debate_rounds`, `max_risk_discuss_rounds`,
+   `output_language`, data vendors, advanced settings), and resolves credentials in the
+   order saved values, then `~/.tradingagents/.env`, then process environment.
+
+   Duplication is deliberate: `app.py` keeps its own copy until it is deleted. Do NOT
+   refactor `app.py` to share this module; the legacy UI is on its way out and touching it
+   risks breaking a working app for no benefit. Say so in a comment.
+5. `runner.py`: apply the resolved config and credentials to the run. Credentials must be
+   injected with `runtime_environment.temporary_environment` around the run, exactly as
+   `app.py` does, so process-global env vars are restored afterwards. Reject a run whose
+   provider is missing a required credential with a clear error instead of falling back to
+   upstream defaults. Never fall back silently to OpenAI.
+6. Settings screen at `/settings`: ticker, analysis date, output language, analysts, research
+   depth, provider, quick and deep model, per-provider credential fields (masked, with a
+   reveal toggle), Advanced Settings and Data Sources, and Save. It must load existing values
+   from the API on mount so the user sees their current configuration, not blanks.
+7. Run launcher: drive it from the saved settings and the provider catalog instead of only
+   ticker/date/step delay, so starting a run uses the user's provider and models.
+
+Anti-regression requirements:
+
+- A test asserting a run started with a provider whose required credential is absent is
+  REJECTED, and that no request is made to upstream defaults. This is the exact failure that
+  shipped in P1-P5.
+- A test asserting `GET /api/credentials` never returns a secret value.
+- A test asserting the saved `~/.tradingagents/ui_preferences.json` values are surfaced by
+  `GET /api/credentials` (point it at a temp dir; never write to the real one).
+
+Acceptance:
+```
+.venv/bin/python -m pytest tests/ -q
+.venv/bin/python -m ruff check .
+cd frontend && npx tsc --noEmit
+cd frontend && npx playwright test
+```
+Plus a manual demonstration, with raw output, that `GET /api/providers` lists DeepSeek and
+that a run request specifying `provider: deepseek` with no saved key is rejected with a
+clear message rather than silently using OpenAI.
+
 - Two consecutive acceptance failures in the same phase: stop and report raw output. Do not
   widen the change.
 - Any need to touch upstream `tradingagents` source: stop.
