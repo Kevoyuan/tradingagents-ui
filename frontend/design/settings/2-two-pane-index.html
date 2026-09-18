@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Settings — Two-Pane Index</title>
+<!--
+Direction 2 · "Two-Pane Index" — settings as a document with chapters.
+
+form 推导五问：
+1. 叙事角色 — 这一版把设置当成「五章参考手册」而不是一张表。打开时先看目录（左），
+   每章标题下直接印着当前值，所以「我现在是什么配置」这个问题在目录层就被回答了，不必
+   翻进去。
+2. 观众距离 — 1m 桌面。左侧索引是扫描用的，右侧是编辑用的：索引要求横向短、纵向可扫，
+   编辑区要求字段少而疏，一次只处理一章。
+3. 视觉温度 — 安静、有秩序。一次只显示一章，留白比方向一多得多，情绪是「逐章核阅」。
+4. 容量估算 — 三张 5 秒缩略图：(a) 索引 + Provider 章节，(b) 切到 Credentials 章节，
+   (c) 保存条。每章 4–8 个字段，纵向绰绰有余，因此可以把字段排成「标签左、控件右」的
+   宽行。
+5. 视觉母题 — **带当前值的目录**。这是配置内容独有的：配置天然分层，而每一层都能用一句
+   话概括自己的状态。所以索引项不是纯导航，而是「标题 + 现值摘要」的两行结构，选中项用
+   一条竖线标记，像书的书脊。
+
+form comes from：配置的层级性——五组设置各有当前状态，目录本身就能承载「我现在是怎样
+配置的」这个最高频问题，因此索引项必须带值而不是只有名字。
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#fff; --page:#f2f1ee; --rule:#dcdad4; --rule-2:#ebe9e4;
+    --ink:#0a0a0a; --ink-2:#3d3a35; --mut:#6e6a63; --faint:#9c978e;
+    --ok:#0b6b3a;
+    --grotesk:Archivo,"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--page);color:var(--ink);font-family:var(--grotesk);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  h1,h2,h3,p{margin:0}
+  .num{font-variant-numeric:tabular-nums}
+  .shell{display:grid;grid-template-columns:56px minmax(0,1fr)}
+  .irail{background:var(--ink);height:100vh;display:flex;flex-direction:column;align-items:center;padding:16px 0;gap:4px}
+  .imark{width:24px;height:24px;display:flex;flex-direction:column;justify-content:center;gap:2.5px;margin-bottom:18px}
+  .imark i{display:block;height:2.5px;background:#fff}
+  .imark i:nth-child(1){width:100%}.imark i:nth-child(2){width:56%}.imark i:nth-child(3){width:80%}
+  .irail a{width:36px;height:36px;display:grid;place-items:center;color:#7c786f;text-decoration:none}
+  .irail a[aria-current]{color:#fff}
+
+  .main{background:var(--paper);min-height:100vh;display:flex;flex-direction:column}
+  .mast{height:62px;display:flex;align-items:center;gap:26px;padding:0 40px;border-bottom:1px solid var(--ink)}
+  .wordmark{font-size:13px;font-weight:700;letter-spacing:.15em;text-transform:uppercase}
+  .nav{display:flex;gap:22px}
+  .nav a{font-size:12px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);text-decoration:none}
+  .nav a[aria-current]{color:var(--ink);font-weight:700}
+  .mast-r{margin-left:auto;display:flex;align-items:center;gap:20px}
+  .save{background:var(--ink);color:#fff;border:1px solid var(--ink);font-family:var(--grotesk);font-size:12px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;padding:11px 20px;cursor:pointer}
+  .save.ghost{background:transparent;color:var(--ink)}
+
+  .body{flex:1;display:grid;grid-template-columns:332px minmax(0,1fr);min-height:0}
+
+  /* index */
+  .idx{border-right:1px solid var(--rule);padding:26px 0 40px 40px;display:flex;flex-direction:column}
+  .idx-h{font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--mut);padding-bottom:12px;margin-right:28px;border-bottom:1px solid var(--ink)}
+  .idx ol{list-style:none;margin:0;padding:0}
+  .idx li{position:relative;padding:15px 28px 15px 0;border-bottom:1px solid var(--rule-2);cursor:pointer;display:grid;grid-template-columns:24px 1fr;gap:10px}
+  .idx li .no{font-family:var(--mono);font-size:12px;color:var(--faint);padding-top:2px}
+  .idx li .t{font-size:14.5px;font-weight:600;letter-spacing:-.005em}
+  .idx li .v{font-size:12.5px;color:var(--mut);margin-top:3px;font-family:var(--mono);line-height:1.45}
+  .idx li[aria-current]{background:var(--page)}
+  .idx li[aria-current]::before{content:"";position:absolute;left:-40px;top:0;bottom:0;width:3px;background:var(--ink)}
+  .idx li[aria-current] .t{color:var(--ink)}
+  .idx li[aria-current] .v{color:var(--ink-2)}
+  .idx-foot{margin-top:auto;padding:18px 28px 0 0;font-size:12.5px;color:var(--faint);line-height:1.6}
+
+  /* detail */
+  .detail{padding:30px 52px 40px;overflow-y:auto}
+  .d-h{display:flex;align-items:baseline;gap:14px;padding-bottom:14px;border-bottom:1px solid var(--ink)}
+  .d-h .no{font-family:var(--mono);font-size:12px;color:var(--faint)}
+  .d-h h1{font-size:26px;font-weight:600;letter-spacing:-.025em}
+  .d-h .tag{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--mut)}
+  .d-sub{margin-top:14px;font-size:13.5px;color:var(--mut);max-width:62ch;line-height:1.65}
+
+  .fields{margin-top:26px;max-width:820px}
+  .fr{display:grid;grid-template-columns:230px 1fr;gap:28px;padding:17px 0;border-bottom:1px solid var(--rule-2);align-items:start}
+  .fr .lab{font-size:14px;font-weight:600}
+  .fr .help{font-size:12.5px;color:var(--faint);margin-top:4px;line-height:1.6;font-weight:400}
+  .ctl{display:flex;align-items:center;gap:10px;min-height:38px;border:1px solid var(--rule);background:var(--paper);padding:0 12px;font-size:14px}
+  .ctl .v{font-weight:500}
+  .ctl .mono{font-family:var(--mono);font-size:13px}
+  .ctl .chev{margin-left:auto;color:var(--faint)}
+  .ctl .st{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--ok)}
+  .ctl .st::before{content:"● ";font-size:9px}
+  .ctl.readonly{background:var(--page);color:var(--mut)}
+  .ctl.masked .v{font-family:var(--mono);letter-spacing:.18em;color:var(--ink-2)}
+  .pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .native{margin-top:8px;font-size:12.5px;color:var(--faint)}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="irail">
+    <span class="imark"><i></i><i></i><i></i></span>
+    <a href="#" title="Monitor"><svg width="16" height="16" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="3.5" width="15" height="10.5" stroke="currentColor" stroke-width="1.6"/><path d="M7 17h6M10 14v3" stroke="currentColor" stroke-width="1.6"/></svg></a>
+    <a href="#" title="Reports"><svg width="16" height="16" viewBox="0 0 20 20" fill="none"><path d="M5 2.6h6.4L15.5 6.7v10.7H5z" stroke="currentColor" stroke-width="1.6"/><path d="M7.4 10.4h5.6M7.4 13.2h4" stroke="currentColor" stroke-width="1.6"/></svg></a>
+    <a href="#" aria-current="page" title="Settings"><svg width="16" height="16" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="2.6" stroke="currentColor" stroke-width="1.6"/><path d="M10 2.6v2.2M10 15.2v2.2M17.4 10h-2.2M4.8 10H2.6" stroke="currentColor" stroke-width="1.6"/></svg></a>
+  </nav>
+
+  <div class="main">
+    <header class="mast">
+      <span class="wordmark">TradingAgents</span>
+      <nav class="nav"><a href="#">Monitor</a><a href="#">Reports</a><a href="#" aria-current="page">Settings</a></nav>
+      <div class="mast-r">
+        <button class="save ghost">Reset</button>
+        <button class="save">Save preferences</button>
+      </div>
+    </header>
+
+    <div class="body">
+
+      <nav class="idx">
+        <div class="idx-h">Configuration</div>
+        <ol>
+          <li>
+            <span class="no">01</span>
+            <span>
+              <div class="t">Run defaults</div>
+              <div class="v">NBIS · 2026-09-18 · Chinese<br>Deep (5 rounds)</div>
+            </span>
+          </li>
+          <li aria-current="page">
+            <span class="no">02</span>
+            <span>
+              <div class="t">Provider &amp; models</div>
+              <div class="v">DeepSeek<br>deepseek-v4-flash · both</div>
+            </span>
+          </li>
+          <li>
+            <span class="no">03</span>
+            <span>
+              <div class="t">Credentials</div>
+              <div class="v">DeepSeek key set<br>2 data keys set</div>
+            </span>
+          </li>
+          <li>
+            <span class="no">04</span>
+            <span>
+              <div class="t">Advanced settings</div>
+              <div class="v">Upstream defaults</div>
+            </span>
+          </li>
+          <li>
+            <span class="no">05</span>
+            <span>
+              <div class="t">Data sources</div>
+              <div class="v">yfinance + alpha_vantage<br>fred · polymarket</div>
+            </span>
+          </li>
+        </ol>
+        <p class="idx-foot">上次保存 2026-09-18 23:18。<br>改动会写入 <span style="font-family:var(--mono)">~/.tradingagents/ui_preferences.json</span>。</p>
+      </nav>
+
+      <section class="detail">
+        <div class="d-h"><span class="no">02</span><h1>Provider &amp; models</h1><span class="tag">native provider</span></div>
+        <p class="d-sub">这三个值决定整条分析链路用什么模型。运行开始后被固化进该次运行的配置，之后改这里不会影响已在跑的分析。</p>
+
+        <div class="fields">
+          <div class="fr">
+            <div>
+              <div class="lab">LLM provider</div>
+              <div class="help">TradingAgents 原生支持的供应商，凭据与端点按上游注册表解析。</div>
+            </div>
+            <div>
+              <div class="ctl"><span class="v">TradingAgents · DeepSeek</span><span class="chev">▾</span></div>
+              <div class="native">Native TradingAgents provider.</div>
+            </div>
+          </div>
+
+          <div class="fr">
+            <div>
+              <div class="lab">Quick-thinking model</div>
+              <div class="help">用于数据检索与短决策，调用频率最高。</div>
+            </div>
+            <div class="ctl"><span class="v mono">deepseek-v4-flash</span><span class="chev">▾</span></div>
+          </div>
+
+          <div class="fr">
+            <div>
+              <div class="lab">Deep-thinking model</div>
+              <div class="help">用于研究员辩论与最终裁决。</div>
+            </div>
+            <div class="ctl"><span class="v mono">deepseek-v4-flash</span><span class="chev">▾</span></div>
+          </div>
+
+          <div class="fr">
+            <div>
+              <div class="lab">Endpoint</div>
+              <div class="help">由供应商解析得出，不可直接编辑。自定义端点请改选 Compatible 供应商。</div>
+            </div>
+            <div class="ctl readonly"><span class="v mono">https://api.deepseek.com</span></div>
+          </div>
+
+          <div class="fr" style="border-bottom:0">
+            <div>
+              <div class="lab">Credential</div>
+              <div class="help">DeepSeek 需要一个 API key。编辑在 03 Credentials。</div>
+            </div>
+            <div class="ctl"><span class="v mono" style="color:var(--mut)">DEEPSEEK_API_KEY</span><span class="st">set</span></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+</body>
+</html>

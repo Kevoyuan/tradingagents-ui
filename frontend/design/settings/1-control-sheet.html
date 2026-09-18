@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Settings — Control Sheet</title>
+<!--
+Direction 1 · "Control Sheet" — the whole configuration on one page.
+
+form 推导五问：
+1. 叙事角色 — 设置页在一次运行里几乎不看，看的时候要一次看完。它不是 hero，是一张
+   参考表：你打开它确认「我现在是什么配置」，改一两处，离开。
+2. 观众距离 — 1m 桌面显示器。这个距离允许一屏放 15 个控件，但要求标签与值能横向对齐，
+   眼睛顺着列往下扫就能比对，而不是逐行读。
+3. 视觉温度 — 冷静、无情绪。设置页不该有个性，它该像一份填好的表格：准确、克制、
+   每一格都在同一个基线上。
+4. 容量估算 — 三张 5 秒缩略图：(a) 页头 + 三列首屏，(b) 中段折叠区展开，(c) 保存条。
+   15 个控件分三列，每列 5 组，全部进 1050px，不需要滚。
+5. 视觉母题 — **填好的表格**。这是这个内容独有的：一份配置之所以是配置，就在于它的
+   键与值成对、可被逐行核对。所以采用「标签列 + 值列」的严格双栏，值全部左对齐在同一
+   条垂直线上，行与行之间只有发丝线。三列并排本身就是一次横向对比：Run defaults 与
+   Provider 与 Credentials 各自成栏，互不打扰。
+
+form comes from：配置数据的「键值对」本质——它不是叙事，是可核对的清单，所以排版按表
+格对齐而不是按阅读节奏排。
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#fff; --page:#f2f1ee; --rule:#dcdad4; --rule-2:#ebe9e4;
+    --ink:#0a0a0a; --ink-2:#3d3a35; --mut:#6e6a63; --faint:#9c978e;
+    --ok:#0b6b3a; --warn:#a8121f;
+    --grotesk:Archivo,"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--page);color:var(--ink);font-family:var(--grotesk);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  h1,h2,h3,p{margin:0}
+  .num{font-variant-numeric:tabular-nums}
+  .cap{font-size:12px;font-weight:600;letter-spacing:.13em;text-transform:uppercase}
+  .shell{display:grid;grid-template-columns:56px minmax(0,1fr)}
+
+  .irail{background:var(--ink);height:100vh;display:flex;flex-direction:column;align-items:center;padding:16px 0;gap:4px}
+  .imark{width:24px;height:24px;display:flex;flex-direction:column;justify-content:center;gap:2.5px;margin-bottom:18px}
+  .imark i{display:block;height:2.5px;background:#fff}
+  .imark i:nth-child(1){width:100%}.imark i:nth-child(2){width:56%}.imark i:nth-child(3){width:80%}
+  .irail a{width:36px;height:36px;display:grid;place-items:center;color:#7c786f;text-decoration:none}
+  .irail a[aria-current]{color:#fff}
+
+  .main{background:var(--paper);min-height:100vh}
+  .mast{height:62px;display:flex;align-items:center;gap:26px;padding:0 40px;border-bottom:1px solid var(--ink)}
+  .wordmark{font-size:13px;font-weight:700;letter-spacing:.15em;text-transform:uppercase}
+  .nav{display:flex;gap:22px}
+  .nav a{font-size:12px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);text-decoration:none}
+  .nav a[aria-current]{color:var(--ink);font-weight:700}
+  .mast-r{margin-left:auto;display:flex;align-items:center;gap:22px}
+  .cur{text-align:right}
+  .cur .t{font-size:16px;font-weight:600;letter-spacing:-.01em}
+  .cur .s{font-size:12px;color:var(--mut);font-family:var(--mono)}
+
+  /* page head */
+  .ph{display:flex;align-items:flex-end;gap:26px;padding:2px 40px 18px;border-bottom:1px solid var(--rule)}
+  .ph h1{font-size:40px;font-weight:600;letter-spacing:-.035em;line-height:1}
+  .ph .sub{font-size:13.5px;color:var(--mut);padding-bottom:4px}
+  .ph .sub b{color:var(--ink);font-weight:600}
+  .save{margin-left:auto;background:var(--ink);color:#fff;border:1px solid var(--ink);font-family:var(--grotesk);font-size:12px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;padding:12px 22px;cursor:pointer}
+  .ph-actions{margin-left:auto;display:flex;gap:9px}
+  .save.ghost{background:transparent;color:var(--ink);margin-left:0}
+
+  /* three columns */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0;padding:0 40px 40px}
+  .col{padding:26px 34px 0 0;border-right:1px solid var(--rule)}
+  .col:last-child{border-right:0;padding-right:0}
+  .col:nth-child(2){padding-left:34px}
+  .col:nth-child(3){padding-left:34px}
+
+  .sec + .sec{margin-top:32px}
+  .sec-h{display:flex;align-items:baseline;gap:10px;padding-bottom:9px;border-bottom:1px solid var(--ink);margin-bottom:2px}
+  .sec-h .no{font-family:var(--mono);font-size:12px;color:var(--faint)}
+  .sec-h h2{font-size:12px;font-weight:700;letter-spacing:.15em;text-transform:uppercase}
+  .sec-h .hint{margin-left:auto;font-size:12px;color:var(--faint)}
+
+  .f{display:grid;grid-template-columns:1fr;gap:5px;padding:13px 0;border-bottom:1px solid var(--rule-2)}
+  .f > label{font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  .ctl{display:flex;align-items:center;gap:10px;min-height:34px;border:1px solid var(--rule);background:var(--paper);padding:0 11px;font-size:14px;color:var(--ink)}
+  .ctl .v{font-weight:500}
+  .ctl .mono{font-family:var(--mono);font-size:13px}
+  .ctl .chev{margin-left:auto;color:var(--faint)}
+  .ctl .eye{margin-left:auto;color:var(--faint);cursor:pointer}
+  .ctl.masked .v{font-family:var(--mono);letter-spacing:.18em;color:var(--ink-2)}
+  .ctl .st{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--ok)}
+  .ctl .st::before{content:"● ";font-size:9px}
+
+  /* analysts as square toggles */
+  .toggles{display:flex;flex-wrap:wrap;gap:6px}
+  .tg{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--ink);background:var(--ink);color:#fff;font-size:13px;font-weight:500;padding:7px 11px;cursor:pointer}
+  .tg.off{border-color:var(--rule);background:transparent;color:var(--mut)}
+  .tg i{width:8px;height:8px;border:1px solid currentColor;display:block}
+  .tg:not(.off) i{background:#fff}
+
+  .seg{display:flex;border:1px solid var(--rule)}
+  .seg span{flex:1;text-align:center;padding:8px 0;font-size:13px;color:var(--mut);border-right:1px solid var(--rule);cursor:pointer}
+  .seg span:last-child{border-right:0}
+  .seg span[aria-pressed]{background:var(--ink);color:#fff;font-weight:600}
+
+  .sec2{margin-top:32px}
+  .sec2 .sec-h{margin-bottom:2px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .note{font-size:12.5px;color:var(--faint);line-height:1.6;margin-top:8px}
+
+  .changes{display:flex;align-items:center;gap:12px;padding-top:14px;border-top:1px solid var(--rule);margin-top:14px;font-size:12.5px;color:var(--mut)}
+  .changes b{color:var(--ink);font-weight:600}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="irail">
+    <span class="imark"><i></i><i></i><i></i></span>
+    <a href="#" title="Monitor"><svg width="16" height="16" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="3.5" width="15" height="10.5" stroke="currentColor" stroke-width="1.6"/><path d="M7 17h6M10 14v3" stroke="currentColor" stroke-width="1.6"/></svg></a>
+    <a href="#" title="Reports"><svg width="16" height="16" viewBox="0 0 20 20" fill="none"><path d="M5 2.6h6.4L15.5 6.7v10.7H5z" stroke="currentColor" stroke-width="1.6"/><path d="M7.4 10.4h5.6M7.4 13.2h4" stroke="currentColor" stroke-width="1.6"/></svg></a>
+    <a href="#" aria-current="page" title="Settings"><svg width="16" height="16" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="2.6" stroke="currentColor" stroke-width="1.6"/><path d="M10 2.6v2.2M10 15.2v2.2M17.4 10h-2.2M4.8 10H2.6" stroke="currentColor" stroke-width="1.6"/></svg></a>
+  </nav>
+
+  <div class="main">
+    <header class="mast">
+      <span class="wordmark">TradingAgents</span>
+      <nav class="nav"><a href="#">Monitor</a><a href="#">Reports</a><a href="#" aria-current="page">Settings</a></nav>
+      <div class="mast-r">
+        <div class="cur"><div class="t">Settings</div><div class="s">saved 2026-09-18 23:18</div></div>
+      </div>
+    </header>
+
+    <div class="ph">
+      <h1>Configuration</h1>
+      <span class="sub">下一run：<b>NBIS</b> · 2026-09-18 · Chinese · Deep (5 rounds) · DeepSeek</span>
+      <span class="ph-actions">
+        <button class="save ghost">Reset</button>
+        <button class="save">Save preferences</button>
+      </span>
+    </div>
+
+    <div class="grid">
+
+      <!-- column 1 -->
+      <div class="col">
+        <div class="sec">
+          <div class="sec-h"><span class="no">01</span><h2>Run defaults</h2></div>
+
+          <div class="f">
+            <label for="tk">Ticker symbol</label>
+            <div class="ctl"><span class="v mono">NBIS</span></div>
+          </div>
+          <div class="f">
+            <label for="dt">Analysis date</label>
+            <div class="ctl"><span class="v mono num">2026-09-18</span></div>
+          </div>
+          <div class="f">
+            <label>Output language</label>
+            <div class="ctl"><span class="v">Chinese</span><span class="chev">▾</span></div>
+          </div>
+          <div class="f">
+            <label>Analysts</label>
+            <div class="toggles">
+              <span class="tg"><i></i>Market</span>
+              <span class="tg"><i></i>Social</span>
+              <span class="tg"><i></i>News</span>
+              <span class="tg"><i></i>Fundamentals</span>
+            </div>
+          </div>
+          <div class="f" style="border-bottom:0">
+            <label>Research depth</label>
+            <div class="seg">
+              <span>Shallow · 1</span><span>Medium · 3</span><span aria-pressed="true">Deep · 5</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="changes">
+          <b>首次运行前请确认</b> · Ticker 与日期会决定报告落盘目录
+        </div>
+      </div>
+
+      <!-- column 2 -->
+      <div class="col">
+        <div class="sec">
+          <div class="sec-h"><span class="no">02</span><h2>Provider &amp; models</h2><span class="hint">native</span></div>
+
+          <div class="f">
+            <label>LLM provider</label>
+            <div class="ctl"><span class="v">TradingAgents · DeepSeek</span><span class="chev">▾</span></div>
+          </div>
+          <div class="f">
+            <label>Quick-thinking model</label>
+            <div class="ctl"><span class="v mono">deepseek-v4-flash</span><span class="chev">▾</span></div>
+          </div>
+          <div class="f">
+            <label>Deep-thinking model</label>
+            <div class="ctl"><span class="v mono">deepseek-v4-flash</span><span class="chev">▾</span></div>
+          </div>
+          <div class="f" style="border-bottom:0">
+            <label>Endpoint</label>
+            <div class="ctl"><span class="v mono" style="color:var(--mut)">https://api.deepseek.com</span></div>
+          </div>
+        </div>
+
+        <div class="sec sec2">
+          <div class="sec-h"><span class="no">04</span><h2>Advanced settings</h2></div>
+          <div>
+            <div class="row2">
+              <div class="f" style="padding-top:0"><label>Temperature</label><div class="ctl"><span class="v" style="color:var(--faint)">Upstream default</span></div></div>
+              <div class="f" style="padding-top:0"><label>LLM max retries</label><div class="ctl"><span class="v" style="color:var(--faint)">Upstream default</span></div></div>
+            </div>
+            <p class="note">Checkpoint 已在官方默认下关闭；开启后中断的运行可续跑。</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- column 3 -->
+      <div class="col">
+        <div class="sec">
+          <div class="sec-h"><span class="no">03</span><h2>Credentials</h2><span class="hint">local only</span></div>
+
+          <div class="f">
+            <label>DeepSeek API key</label>
+            <div class="ctl masked"><span class="v">••••••••••••••••••••••••</span><span class="st">set</span></div>
+            <p class="note">写入 <span style="font-family:var(--mono)">~/.tradingagents/.env</span>，权限 600，不会进仓库。</p>
+          </div>
+          <div class="f" style="border-bottom:0">
+            <label>Data API keys</label>
+            <div class="ctl"><span class="v mono" style="color:var(--mut)">ALPHA_VANTAGE_API_KEY</span><span class="st">set</span></div>
+            <div class="ctl" style="margin-top:6px"><span class="v mono" style="color:var(--mut)">FRED_API_KEY</span><span class="st">set</span></div>
+          </div>
+        </div>
+
+        <div class="sec sec2">
+          <div class="sec-h"><span class="no">05</span><h2>Data sources</h2></div>
+          <div>
+            <div class="f" style="padding-top:0"><label>Core stock data</label><div class="ctl"><span class="v mono">yfinance, alpha_vantage</span><span class="chev">▾</span></div></div>
+            <div class="f"><label>Fundamentals</label><div class="ctl"><span class="v mono">yfinance, alpha_vantage</span><span class="chev">▾</span></div></div>
+            <div class="f"><label>News</label><div class="ctl"><span class="v mono">yfinance, alpha_vantage</span><span class="chev">▾</span></div></div>
+            <div class="f"><label>Macro</label><div class="ctl"><span class="v mono">fred</span></div></div>
+            <p class="note">每个选择都是精确的：TradingAgents 不会自动加未勾选的兜底源。</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</body>
+</html>

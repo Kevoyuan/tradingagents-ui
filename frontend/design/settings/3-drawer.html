@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Settings — Instrument Drawer</title>
+<!--
+Direction 3 · "Instrument Drawer" — settings without leaving the run.
+
+form 推导五问：
+1. 叙事角色 — 设置不是目的地，是一次打断。真实场景是：一个 run 正在跑，你想换 deep
+   model 再开下一个；或者你正要按 New Run，想先确认 provider。这两种情况都不该把你从
+   监控屏上带走，因为屏幕上正处于变化中的东西（agent 状态、决策）才是你在看的东西。
+2. 观众距离 — 1m 桌面，且屏幕此刻有第二个信息源（背后的运行）。抽屉必须窄到让背后的
+   运行仍可感知，所以取 600px 左右，并把决策带留在视野内。
+3. 视觉温度 — 轻、可来可走。抽屉浮在内容之上但只压住右侧，背景压暗到 20% 而不是全黑，
+   让人始终知道「我还在运行界面上」。
+4. 容量估算 — 三张 5 秒缩略图：(a) 抽屉打开在 Provider 段，(b) 滚到 Credentials，
+   (c) 保存条。抽屉宽 600px，因此字段必须走「标签在上、控件在下」的单列紧凑布局。
+5. 视觉母题 — **仪表抽屉**。这是这个产品独有的：运行监控是一条持续的状态流，配置是挂在
+   它旁边的可抽出层。所以抽屉顶部钉一个 "Next run" 摘要条——它把「我现在要启动的到底是
+   什么配置」压成一行，让配置和即将发生的事在同一视野里对齐。
+
+form comes from：监控与配置在同一屏共存的真实用法——配置是叠加层而不是页面，因此顶部
+摘要条必须复述即将启动的运行，抽屉必须让位给背后的状态流。
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#fff; --page:#f2f1ee; --rule:#dcdad4; --rule-2:#ebe9e4;
+    --ink:#0a0a0a; --ink-2:#3d3a35; --mut:#6e6a63; --faint:#9c978e;
+    --ok:#0b6b3a; --buy:#0b6b3a;
+    --grotesk:Archivo,"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;height:100%}
+  body{background:var(--page);color:var(--ink);font-family:var(--grotesk);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow:hidden}
+  h1,h2,h3,p{margin:0}
+  .num{font-variant-numeric:tabular-nums}
+  .shell{display:grid;grid-template-columns:56px minmax(0,1fr);height:100vh}
+  .irail{background:var(--ink);display:flex;flex-direction:column;align-items:center;padding:16px 0;gap:4px}
+  .imark{width:24px;height:24px;display:flex;flex-direction:column;justify-content:center;gap:2.5px;margin-bottom:18px}
+  .imark i{display:block;height:2.5px;background:#fff}
+  .imark i:nth-child(1){width:100%}.imark i:nth-child(2){width:56%}.imark i:nth-child(3){width:80%}
+  .irail a{width:36px;height:36px;display:grid;place-items:center;color:#7c786f;text-decoration:none}
+  .irail a[aria-current]{color:#fff}
+
+  /* ── the Monitor behind ─────────────────────────────────── */
+  .monitor{background:var(--paper);min-height:0;overflow:hidden;position:relative}
+  .mast{height:62px;display:flex;align-items:center;gap:26px;padding:0 40px;border-bottom:1px solid var(--ink)}
+  .wordmark{font-size:13px;font-weight:700;letter-spacing:.15em;text-transform:uppercase}
+  .nav{display:flex;gap:22px}
+  .nav a{font-size:12px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);text-decoration:none}
+  .nav a[aria-current]{color:var(--ink);font-weight:700}
+  .nav a.gear{color:var(--ink);font-weight:700;border-bottom:2px solid var(--ink);padding-bottom:2px}
+  .runid{margin-left:auto;text-align:right}
+  .runid .t{font-size:18px;font-weight:600;letter-spacing:-.015em}
+  .runid .s{font-size:12px;color:var(--mut)}
+
+  .vb{display:grid;grid-template-columns:auto 1px auto 1px 1fr;padding:0 40px;border-bottom:1px solid var(--ink)}
+  .vb-l{padding:20px 40px 22px 0}
+  .vb-l .cap{font-size:12px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--mut);display:flex;align-items:center;gap:9px}
+  .vb-l .cap i{width:6px;height:6px;background:var(--buy);display:block}
+  .action{font-size:62px;font-weight:600;letter-spacing:-.045em;line-height:.92;margin-top:9px;color:var(--buy)}
+  .vr{background:var(--rule)}
+  .vb-m{padding:22px 40px;display:flex;flex-direction:column;justify-content:center;gap:14px}
+  .figrow{display:flex;gap:38px}
+  .fig .k{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+  .fig .v{font-size:22px;font-weight:600;letter-spacing:-.025em;margin-top:4px}
+  .stages{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--rule);padding:0 40px}
+  .stg{display:flex;align-items:baseline;gap:9px;padding:12px 0 12px 16px;border-right:1px solid var(--rule-2)}
+  .stg:first-child{padding-left:0}.stg:last-child{border-right:0}
+  .stg .sq{width:9px;height:9px;border:1px solid var(--faint);align-self:center}
+  .stg .nm{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+  .stg .ct{font-size:13px;color:var(--faint);margin-left:auto;padding-right:16px}
+  .stg.done .sq{background:var(--mut);border-color:var(--mut)}
+  .stg.now .sq{background:var(--ink);border-color:var(--ink)}
+  .stg.now .nm{color:var(--ink);font-weight:700}
+  .rec{padding:22px 40px}
+  .rec-h{font-size:12px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;padding-bottom:10px;border-bottom:1px solid var(--ink)}
+  .ev{display:grid;grid-template-columns:70px 1fr;gap:20px;padding:14px 0;border-bottom:1px solid var(--rule)}
+  .ev .t{font-size:12.5px;color:var(--faint)}
+  .ev .who{font-size:15.5px;font-weight:600}
+  .ev .bd{font-size:14px;color:var(--ink-2);margin-top:6px;line-height:1.7}
+  .ev .bd em{font-family:var(--mono);font-style:normal;font-size:13px;color:var(--mut)}
+
+  /* ── scrim + drawer ─────────────────────────────────────── */
+  .scrim{position:absolute;inset:0;background:rgba(10,10,10,.30);z-index:5}
+  .drawer{
+    position:absolute;top:0;right:0;bottom:0;width:608px;z-index:6;
+    background:var(--paper);border-left:1px solid var(--ink);
+    display:flex;flex-direction:column;box-shadow:-18px 0 48px rgba(10,10,10,.10);
+  }
+  .dr-h{flex:0 0 auto;display:flex;align-items:center;gap:14px;padding:0 28px;height:62px;border-bottom:1px solid var(--ink)}
+  .dr-h h1{font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}
+  .dr-h .saved{font-family:var(--mono);font-size:12px;color:var(--faint)}
+  .dr-h .x{margin-left:auto;width:28px;height:28px;display:grid;place-items:center;border:1px solid var(--rule);background:none;cursor:pointer;color:var(--ink-2)}
+
+  .next{flex:0 0 auto;background:var(--page);border-bottom:1px solid var(--rule);padding:15px 28px}
+  .next .k{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+  .next .v{font-family:var(--mono);font-size:13px;margin-top:6px;color:var(--ink);line-height:1.6}
+  .next .v b{font-weight:500}
+  .next .v span{color:var(--faint);padding:0 7px}
+
+  .dr-b{flex:1;min-height:0;overflow-y:auto;padding:6px 28px 24px}
+  .sec{padding:20px 0 6px}
+  .sec-h{display:flex;align-items:baseline;gap:9px;padding-bottom:8px;border-bottom:1px solid var(--ink)}
+  .sec-h .no{font-family:var(--mono);font-size:12px;color:var(--faint)}
+  .sec-h h2{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+  .sec-h .tag{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--faint)}
+  .f{padding:12px 0;border-bottom:1px solid var(--rule-2)}
+  .f .lb{font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:5px}
+  .ctl{display:flex;align-items:center;gap:10px;min-height:34px;border:1px solid var(--rule);padding:0 11px;font-size:14px}
+  .ctl .v{font-weight:500}
+  .ctl .mono{font-family:var(--mono);font-size:13px}
+  .ctl .chev{margin-left:auto;color:var(--faint)}
+  .ctl .st{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--ok)}
+  .ctl .st::before{content:"● ";font-size:9px}
+  .ctl.masked .v{font-family:var(--mono);letter-spacing:.18em;color:var(--ink-2)}
+  .ctl.ro{background:var(--page);color:var(--mut)}
+  .pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .tgrow{display:flex;flex-wrap:wrap;gap:6px}
+  .tg{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--ink);background:var(--ink);color:#fff;font-size:13px;padding:6px 10px}
+  .tg i{width:7px;height:7px;background:#fff;display:block}
+  .tg.off{border-color:var(--rule);background:transparent;color:var(--mut)}
+  .tg.off i{background:transparent;border:1px solid currentColor}
+  .seg{display:flex;border:1px solid var(--rule)}
+  .seg span{flex:1;text-align:center;padding:7px 0;font-size:13px;color:var(--mut);border-right:1px solid var(--rule)}
+  .seg span:last-child{border-right:0}
+  .seg span[aria-pressed]{background:var(--ink);color:#fff;font-weight:600}
+  .hint{font-size:12.5px;color:var(--faint);margin-top:7px;line-height:1.6}
+
+  .dr-f{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:14px 28px;border-top:1px solid var(--ink);background:var(--paper)}
+  .dirty{font-family:var(--mono);font-size:12px;color:var(--mut)}
+  .dirty b{color:var(--ink)}
+  .btn{margin-left:auto;font-family:var(--grotesk);font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:11px 18px;cursor:pointer;border:1px solid var(--ink)}
+  .btn.ghost{background:transparent;color:var(--ink);margin-left:0}
+  .btn.primary{background:var(--ink);color:#fff}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="irail">
+    <span class="imark"><i></i><i></i><i></i></span>
+    <a href="#" aria-current="page" title="Monitor"><svg width="16" height="16" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="3.5" width="15" height="10.5" stroke="currentColor" stroke-width="1.6"/><path d="M7 17h6M10 14v3" stroke="currentColor" stroke-width="1.6"/></svg></a>
+    <a href="#" title="Reports"><svg width="16" height="16" viewBox="0 0 20 20" fill="none"><path d="M5 2.6h6.4L15.5 6.7v10.7H5z" stroke="currentColor" stroke-width="1.6"/><path d="M7.4 10.4h5.6M7.4 13.2h4" stroke="currentColor" stroke-width="1.6"/></svg></a>
+    <a href="#" title="Settings"><svg width="16" height="16" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="2.6" stroke="currentColor" stroke-width="1.6"/><path d="M10 2.6v2.2M10 15.2v2.2M17.4 10h-2.2M4.8 10H2.6" stroke="currentColor" stroke-width="1.6"/></svg></a>
+  </nav>
+
+  <div class="monitor">
+    <header class="mast">
+      <span class="wordmark">TradingAgents</span>
+      <nav class="nav"><a href="#" aria-current="page">Monitor</a><a href="#">Reports</a><a href="#" class="gear">Settings</a></nav>
+      <div class="runid"><div class="t">NBIS</div><div class="s">2026-09-18 · RUN 4A21C8</div></div>
+    </header>
+
+    <section class="vb">
+      <div class="vb-l">
+        <div class="cap"><i></i>Portfolio manager decision · section 05 of 07</div>
+        <div class="action">BUY</div>
+      </div>
+      <div class="vr"></div>
+      <div class="vb-m">
+        <div class="figrow">
+          <div class="fig"><div class="k">Entry price</div><div class="v num">223.54</div></div>
+          <div class="fig"><div class="k">Stop loss</div><div class="v num">194.38</div></div>
+          <div class="fig"><div class="k">Position sizing</div><div class="v num">2–3%</div></div>
+        </div>
+      </div>
+      <div class="vr"></div>
+    </section>
+
+    <div class="stages">
+      <span class="stg done"><span class="sq"></span><span class="nm">Analysts</span><span class="ct num">4/4</span></span>
+      <span class="stg done"><span class="sq"></span><span class="nm">Research</span><span class="ct num">3/3</span></span>
+      <span class="stg done"><span class="sq"></span><span class="nm">Trading</span><span class="ct num">1/1</span></span>
+      <span class="stg done"><span class="sq"></span><span class="nm">Risk</span><span class="ct num">3/3</span></span>
+      <span class="stg now"><span class="sq"></span><span class="nm">Portfolio</span><span class="ct num">1/1</span></span>
+    </div>
+
+    <div class="rec">
+      <div class="rec-h">The record</div>
+      <div class="ev">
+        <span class="t num">00:41:12</span>
+        <div>
+          <div class="who">Portfolio Manager</div>
+          <div class="bd">评级定为 Underweight 而非 Sell：分子是真的，但分母恶化得更快，现价没有安全边际。<em> · 5,120 tok · 18.4s</em></div>
+        </div>
+      </div>
+      <div class="ev">
+        <span class="t num">00:38:02</span>
+        <div>
+          <div class="who">Trader</div>
+          <div class="bd">分批减仓，将现有敞口削减 1/3 至 1/2；反弹至 235–240 分批减持。<em> · 3,905 tok · 9.4s</em></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scrim"></div>
+
+    <!-- ── drawer ── -->
+    <aside class="drawer">
+      <div class="dr-h">
+        <h1>Settings</h1>
+        <span class="saved">saved 2026-09-18 23:18</span>
+        <button class="x" title="Close">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+
+      <div class="next">
+        <div class="k">Next run</div>
+        <div class="v"><b>NBIS</b><span>·</span>2026-09-18<span>·</span>Chinese<span>·</span>Deep 5<span>·</span>DeepSeek<span>·</span>deepseek-v4-flash</div>
+      </div>
+
+      <div class="dr-b">
+
+        <div class="sec">
+          <div class="sec-h"><span class="no">01</span><h2>Provider &amp; models</h2><span class="tag">native</span></div>
+          <div class="f">
+            <div class="lb">LLM provider</div>
+            <div class="ctl"><span class="v">TradingAgents · DeepSeek</span><span class="chev">▾</span></div>
+            <div class="hint">Native TradingAgents provider.</div>
+          </div>
+          <div class="f" style="border-bottom:0">
+            <div class="pair">
+              <div>
+                <div class="lb">Quick-thinking</div>
+                <div class="ctl"><span class="v mono">deepseek-v4-flash</span><span class="chev">▾</span></div>
+              </div>
+              <div>
+                <div class="lb">Deep-thinking</div>
+                <div class="ctl"><span class="v mono">deepseek-v4-flash</span><span class="chev">▾</span></div>
+              </div>
+            </div>
+            <div class="hint">Endpoint 由供应商解析：<span style="font-family:var(--mono)">https://api.deepseek.com</span></div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-h"><span class="no">02</span><h2>Credentials</h2><span class="tag">local only</span></div>
+          <div class="f">
+            <div class="lb">DeepSeek API key</div>
+            <div class="ctl masked"><span class="v">••••••••••••••••••••</span><span class="st">set</span></div>
+            <div class="hint">写入 <span style="font-family:var(--mono)">~/.tradingagents/.env</span>（权限 600）。</div>
+          </div>
+          <div class="f" style="border-bottom:0">
+            <div class="pair">
+              <div><div class="lb">Alpha Vantage</div><div class="ctl"><span class="v mono" style="color:var(--mut)">set</span></div></div>
+              <div><div class="lb">FRED</div><div class="ctl"><span class="v mono" style="color:var(--mut)">set</span></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-h"><span class="no">03</span><h2>Run defaults</h2></div>
+          <div class="f">
+            <div class="pair">
+              <div><div class="lb">Ticker</div><div class="ctl"><span class="v mono">NBIS</span></div></div>
+              <div><div class="lb">Analysis date</div><div class="ctl"><span class="v mono num">2026-09-18</span></div></div>
+            </div>
+          </div>
+          <div class="f">
+            <div class="lb">Output language</div>
+            <div class="ctl"><span class="v">Chinese</span><span class="chev">▾</span></div>
+          </div>
+          <div class="f">
+            <div class="lb">Analysts</div>
+            <div class="tgrow">
+              <span class="tg"><i></i>Market</span><span class="tg"><i></i>Social</span>
+              <span class="tg"><i></i>News</span><span class="tg"><i></i>Fundamentals</span>
+            </div>
+          </div>
+          <div class="f" style="border-bottom:0">
+            <div class="lb">Research depth</div>
+            <div class="seg"><span>Shallow · 1</span><span>Medium · 3</span><span aria-pressed="true">Deep · 5</span></div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="dr-f">
+        <span class="dirty"><b>2</b> unsaved changes</span>
+        <button class="btn ghost">Discard</button>
+        <button class="btn primary">Save preferences</button>
+      </div>
+    </aside>
+  </div>
+</div>
+</body>
+</html>
