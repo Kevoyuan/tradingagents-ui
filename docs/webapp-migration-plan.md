@@ -104,12 +104,24 @@ preview in the event with `truncated: true` and a `full_ref` the frontend can fe
 Verified on a real report
 (`~/.tradingagents/logs/NBIS/2026-09-18/reports/complete_report.md`):
 
-- line 1029: `## 最终交易建议：BUY NBIS（NMS），分批建仓`
-- line 1423: `## 最终交易建议：SELL NBIS (NMS)`
-- line 1735 (inside `## V. Portfolio Manager Decision`): `**Rating**: Underweight`
+- the merged file contains four BUY recommendations (lines 739, 784, 840, 900, 1029) and
+  four SELL recommendations (lines 1114, 1164, 1214, 1268, 1423), because the research and
+  risk sections concatenate every debater's own conclusion
+- the true verdict is line 1735, inside `## V. Portfolio Manager Decision`:
+  `**Rating**: Underweight`
 
-The true verdict is **Underweight**. Whole-document keyword scanning returns BUY and is
-wrong. Only read the Portfolio Manager decision.
+Measured behaviour of the wrong approaches on this file:
+
+- first rating word found anywhere → `Hold` (line 180). Wrong.
+- first `最终交易建议` heading found → `BUY`. Wrong.
+- `parse_rating(complete_report.md)` → `Underweight`. **Right, but only by luck.** It keys on
+  an explicit `Rating:` label, so it survives this particular file; if the PM section were
+  absent, truncated, or the label reworded, it would silently fall back to its
+  first-rating-word pass and return `Hold`.
+
+So the rule is not merely "prefer the PM section". It is: read `5_portfolio/decision.md`
+only, and apply `parse_rating` to that text. That is deterministic and independent of how
+the merged file happens to be assembled. Do not rely on `parse_rating` over the merged file.
 
 ## 4. Report read path
 
