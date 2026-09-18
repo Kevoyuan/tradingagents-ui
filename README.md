@@ -10,14 +10,31 @@ A local Streamlit desktop-style interface for running [TradingAgents](https://gi
 
 ## Quick Start
 
-Requirements: Python 3.10+ and [uv](https://docs.astral.sh/uv/).
+Requirements: Python 3.10+, [uv](https://docs.astral.sh/uv/), and Node.js 18+ (for frontend build).
 
 ```bash
 git clone https://github.com/Kevoyuan/tradingagents-ui.git
 cd tradingagents-ui
 uv venv --python 3.11
 uv pip install -e .
+bash scripts/build-frontend.sh
+trade-ui
 ```
+
+### Launch Modes
+
+- **Default (FastAPI + React)**: Run `trade-ui` to start the new React SPA and FastAPI backend server.
+- **Legacy (Streamlit)**: Run `trade-ui --legacy` to launch the original Streamlit interface (`app.py`).
+
+### Building the Frontend
+
+The web UI frontend is built with React, Vite, and TypeScript. Build static assets before running the default interface or packaging:
+
+```bash
+bash scripts/build-frontend.sh
+```
+
+Compiled assets are placed into `trade_ui/static/` and packaged directly into wheels for pip distribution without requiring Node at runtime.
 
 ### macOS
 
@@ -94,10 +111,11 @@ The latest complete report is linked at `~/.tradingagents/latest_report.md` when
 
 This release supports TradingAgents `>=0.3.1,<0.4` and installs the exact `v0.3.1` tag by default. The in-app updater also installs the tag shown in its update prompt.
 
-Provider metadata and model choices come from the upstream v0.3.1 registry where possible. UI-only compatible endpoints are maintained separately.
+See [COMPATIBILITY.md](COMPATIBILITY.md) for the verified upstream releases and interface symbol contract matrix.
 
 ## Documentation
 
+- [Compatibility Matrix](COMPATIBILITY.md)
 - [Installation and alternative launch methods](docs/installation.md)
 - [Providers and credentials](docs/providers.md)
 - [Cloud deployment](docs/cloud-deployment.md)
@@ -108,8 +126,10 @@ Provider metadata and model choices come from the upstream v0.3.1 registry where
 
 ```bash
 uv pip install -e .
-pytest tests
+bash scripts/build-frontend.sh
+pytest tests/
+pytest tradingagents_contract/
 ruff check .
 ```
 
-See [docs/development.md](docs/development.md) for architecture, environment variables and direct Streamlit usage.
+See [docs/development.md](docs/development.md) for architecture, environment variables and development usage.

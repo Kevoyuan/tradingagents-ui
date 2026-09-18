@@ -1,4 +1,10 @@
-"""TradingAgents UI - Lightweight Streamlit wrapper with CLI-style layout."""
+"""TradingAgents UI - Lightweight Streamlit wrapper with CLI-style layout.
+
+.. deprecated:: 1.3.0
+    The Streamlit UI in `app.py` is deprecated in favor of the new React + FastAPI
+    interface (launched by default via `trade-ui`). Use `trade-ui --legacy` to launch
+    this Streamlit interface. This module will be removed in a future release.
+"""
 
 from __future__ import annotations
 

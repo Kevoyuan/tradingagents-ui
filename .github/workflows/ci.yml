@@ -13,12 +13,49 @@ jobs:
         python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: python -m pip install --upgrade pip
-      - run: python -m pip install . pytest ruff build
-      - run: python -m pytest tests
-      - run: ruff check .
-      - run: python -m build
-      - run: PYTHON=python scripts/wheel-smoke-test.sh
+      - name: Upgrade pip and install build dependencies
+        run: python -m pip install --upgrade pip
+      - name: Build frontend
+        run: bash scripts/build-frontend.sh
+      - name: Install package and test dependencies
+        run: python -m pip install . pytest ruff build
+      - name: Run unit and server tests
+        run: |
+          unset PYTHONPATH
+          python -m pytest tests/ -q
+      - name: Check code formatting and lint
+        run: ruff check .
+      - name: Upstream contract tests (pinned v0.3.1)
+        run: |
+          unset PYTHONPATH
+          python -m pytest tradingagents_contract -v --tb=short
+      - name: Build distribution packages
+        run: |
+          unset PYTHONPATH
+          python -m build
+      - name: Wheel smoke test
+        run: PYTHON=python bash scripts/wheel-smoke-test.sh
+      - name: Upstream contract tests (latest upstream tag)
+        run: |
+          unset PYTHONPATH
+          set -euo pipefail
+          LATEST_TAG=$(git ls-remote --tags --sort="v:refname" https://github.com/TauricResearch/TradingAgents.git | awk -F'/' '{print $3}' | grep -E '^v[0-9]' | sed 's/\^{}//' | sort -V | tail -n 1)
+          if [ -z "${LATEST_TAG}" ]; then
+            echo "ERROR: Failed to fetch latest upstream git tag from https://github.com/TauricResearch/TradingAgents.git" >&2
+            exit 1
+          fi
+          echo "Latest upstream tag resolved: ${LATEST_TAG}"
+          echo "Installing upstream tag ${LATEST_TAG}..."
+          python -m pip install --upgrade --no-deps "tradingagents @ git+https://github.com/TauricResearch/TradingAgents.git@${LATEST_TAG}"
+          echo "Running contract suite against ${LATEST_TAG}..."
+          python -m pytest tradingagents_contract -v --tb=short || {
+            STATUS=$?
+            echo "::error::Upstream contract test failed against tag ${LATEST_TAG}. Check above pytest output for the specific failing symbol."
+            exit ${STATUS}
+          }

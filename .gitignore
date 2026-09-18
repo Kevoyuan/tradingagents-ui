@@ -15,3 +15,4 @@ node_modules/
 .TradingAgents UI.app.new.*
 build/
 dist/
+trade_ui/static/

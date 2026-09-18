@@ -13,6 +13,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: 'dist',
+    outDir: '../trade_ui/static',
+    emptyOutDir: true,
   },
 });

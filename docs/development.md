@@ -4,12 +4,14 @@
 
 ```bash
 uv pip install -e .
-pytest tests
+bash scripts/build-frontend.sh
+pytest tests/
+pytest tradingagents_contract/
 ruff check .
 mypy app.py ui_config.py ui_panels.py ui_styles.py trade_ui/
 ```
 
-Run locally with `./run.sh` or `trade-ui --port 9000`.
+Run locally with `./run.sh` or `trade-ui --port 9000` (or `trade-ui --legacy` for Streamlit).
 
 ## Architecture
 

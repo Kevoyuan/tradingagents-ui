@@ -1,1 +1,2 @@
 prune tools/baoyu-markdown-to-html/scripts/node_modules
+recursive-include trade_ui/static *
