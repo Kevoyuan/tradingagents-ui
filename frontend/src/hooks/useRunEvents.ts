@@ -77,12 +77,21 @@ export function useRunEvents(
     const eventSource = new EventSource(url);
     setIsConnected(true);
 
+    // EventSource treats any stream close as a dropped connection and retries
+    // on its own. The server closes the stream immediately for a run it does
+    // not own - a run left behind by a previous server process - so with no
+    // guard the client reconnects once a second forever, which is what showed
+    // up as an endless 'events?after=185 200' loop. Count consecutive
+    // connections that deliver nothing and give up; any real event resets it.
+    let emptyConnections = 0;
+
     eventSource.onopen = () => {
       setIsConnected(true);
     };
 
     eventSource.onmessage = (messageEvent) => {
       try {
+        emptyConnections = 0;
         const rawEvent: RunEvent = JSON.parse(messageEvent.data);
         if (!rawEvent || typeof rawEvent.seq !== 'number') return;
 
@@ -125,8 +134,8 @@ export function useRunEvents(
     };
 
     eventSource.onerror = () => {
-      // If run is already completed or inactive, close stream cleanly
-      if (!isRunActive) {
+      emptyConnections += 1;
+      if (!isRunActive || emptyConnections >= 3) {
         eventSource.close();
         setIsConnected(false);
       }
