@@ -3,7 +3,7 @@
 ## Commands
 
 ```bash
-uv pip install -e .
+uv pip install -e ".[dev]"
 bash scripts/build-frontend.sh
 pytest tests/
 pytest tradingagents_contract/

@@ -132,7 +132,7 @@ See [COMPATIBILITY.md](COMPATIBILITY.md) for the verified upstream releases and 
 ## Development
 
 ```bash
-uv pip install -e .
+uv pip install -e ".[dev]"
 bash scripts/build-frontend.sh
 pytest tests/
 pytest tradingagents_contract/

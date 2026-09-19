@@ -9,7 +9,7 @@ tradingagents_adapter.py
 tradingagents_compat.py
 ui_config.py
 images/__init__.py
-images/trade-ui-embedded-html-report.png
+images/trade-ui-exported-html-report.png
 images/trade-ui-history-reports.png
 images/trade-ui-monitor.png
 images/trade-ui-providers.png
@@ -147,8 +147,8 @@ trade_ui/server/registry.py
 trade_ui/server/run_config.py
 trade_ui/server/runner.py
 trade_ui/static/index.html
-trade_ui/static/assets/index-CZtndp79.css
-trade_ui/static/assets/index-Cmxt1rsd.js
+trade_ui/static/assets/index-C6oDorH7.js
+trade_ui/static/assets/index-CSafAb8U.css
 tradingagents_ui.egg-info/PKG-INFO
 tradingagents_ui.egg-info/SOURCES.txt
 tradingagents_ui.egg-info/dependency_links.txt

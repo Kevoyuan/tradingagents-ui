@@ -133,7 +133,7 @@ Provider 元数据和模型选项会尽量直接复用上游 v0.5.0 registry。�
 ## 开发
 
 ```bash
-uv pip install -e .
+uv pip install -e ".[dev]"
 bash scripts/build-frontend.sh
 pytest tests/
 pytest tradingagents_contract/
