@@ -9,7 +9,7 @@ import traceback
 from collections.abc import Callable
 
 from trade_ui.server.event_bus import EventBus
-from trade_ui.server.models import RunConfig, RunHeader
+from trade_ui.server.models import RunConfig, RunHeader, TeamName
 
 logger = logging.getLogger(__name__)
 
@@ -447,33 +447,96 @@ class UpstreamRunner:
                 asset_type = detect_asset_type(ticker)
                 cancelled = False
 
+                # The upstream graph keys every chunk by node name, and that key
+                # is the only thing that says which agent produced the messages.
+                # Flattening the chunk threw it away, so every event went out as
+                # agent=None and the UI could only render "System" - the roster,
+                # the five-stage rail and the agent counters never moved.
+                # Slugs are the ones the frontend roster uses (see INITIAL_ROSTER
+                # in App.tsx); note upstream calls the social analyst
+                # "Sentiment Analyst", so this cannot be a string-equality match.
+                node_agents: dict[str, tuple[str, TeamName]] = {
+                    "Market Analyst": ("market", "analyst"),
+                    "Sentiment Analyst": ("social", "analyst"),
+                    "News Analyst": ("news", "analyst"),
+                    "Fundamentals Analyst": ("fundamentals", "analyst"),
+                    "Bull Researcher": ("bull_researcher", "research"),
+                    "Bear Researcher": ("bear_researcher", "research"),
+                    "Research Manager": ("research_manager", "research"),
+                    "Trader": ("trader", "trading"),
+                    "Aggressive Analyst": ("aggressive_analyst", "risk"),
+                    "Neutral Analyst": ("neutral_analyst", "risk"),
+                    "Conservative Analyst": ("conservative_analyst", "risk"),
+                    "Portfolio Manager": ("portfolio_manager", "portfolio"),
+                }
+                finished: set[str] = set()
+                last_slug: str | None = None
+                last_team: TeamName | None = None
+                last_text_by_agent: dict[str, str] = {}
+
+                def finish(slug: str) -> None:
+                    if slug not in finished:
+                        finished.add(slug)
+                        self.event_bus.publish(
+                            kind="agent_status", payload={"agent": slug, "status": "done"}, agent=slug
+                        )
+
                 for chunk in runner.stream(ticker, trade_date, asset_type=asset_type):
                     if self.cancel_token.is_cancelled:
                         cancelled = True
                         break
 
-                    # Extract messages and states from chunk
-                    msgs = []
-                    if "messages" in chunk:
-                        msgs = chunk["messages"]
-                    else:
-                        for val in chunk.values():
-                            if isinstance(val, dict) and "messages" in val:
-                                msgs.extend(val["messages"])
+                    # Walk the chunk per node so the node key survives. Unknown
+                    # keys (tool nodes, message-clear nodes) belong to whichever
+                    # agent most recently spoke.
+                    for node, node_value in chunk.items():
+                        resolved_agent = node_agents.get(node)
+                        slug, team = resolved_agent if resolved_agent else (last_slug, last_team)
 
-                    for msg in msgs:
-                        content = getattr(msg, "content", str(msg))
-                        self.event_bus.publish(
-                            kind="agent_message",
-                            payload={
-                                "text": content,
-                                "model": "upstream",
-                                "tokens_in": 0,
-                                "tokens_out": 0,
-                                "latency_ms": 0,
-                                "cost_usd": None,
-                            },
-                        )
+                        if resolved_agent and slug not in finished and slug != last_slug:
+                            if last_slug is not None:
+                                finish(last_slug)
+                            self.event_bus.publish(
+                                kind="agent_status",
+                                payload={"agent": slug, "status": "running"},
+                                agent=slug,
+                                team=team,
+                            )
+                            last_slug, last_team = slug, team
+
+                        msgs = []
+                        if isinstance(node_value, dict) and "messages" in node_value:
+                            msgs = node_value["messages"]
+                        elif node == "messages" and isinstance(node_value, list):
+                            msgs = node_value
+
+                        for msg in msgs:
+                            content = getattr(msg, "content", str(msg))
+                            if not content or not str(content).strip():
+                                continue
+                            # The graph re-emits the same message on several
+                            # ticks; without this the record showed "SNDK" six
+                            # times and the same sentence five times.
+                            if slug and last_text_by_agent.get(slug) == content:
+                                continue
+                            if slug:
+                                last_text_by_agent[slug] = content
+                            self.event_bus.publish(
+                                kind="agent_message",
+                                payload={
+                                    "text": content,
+                                    "model": "upstream",
+                                    "tokens_in": 0,
+                                    "tokens_out": 0,
+                                    "latency_ms": 0,
+                                    "cost_usd": None,
+                                },
+                                agent=slug,
+                                team=team,
+                            )
+
+                if last_slug is not None:
+                    finish(last_slug)
 
                 if cancelled or self.cancel_token.is_cancelled:
                     self.event_bus.publish(
