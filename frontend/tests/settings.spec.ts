@@ -47,11 +47,20 @@ test.describe('Settings Screen', () => {
     await expect(drawer).toBeVisible();
     await expect(page.locator('[data-testid="settings-scrim"]')).toBeVisible();
 
-    // It is a left drawer, not a centred dialog.
+    // It sits immediately right of the 56px icon rail, so the rail stays
+    // visible and usable - the drawer must never cover navigation.
     const box = await drawer.boundingBox();
     expect(box).not.toBeNull();
-    expect(Math.round(box!.x)).toBe(0);
+    expect(Math.round(box!.x)).toBe(56);
     expect(Math.round(box!.width)).toBeGreaterThan(700);
+
+    // The nav rail is still on screen and still clickable while Settings is open.
+    const rail = page.locator('nav[aria-label="Sidebar Navigation"]');
+    await expect(rail).toBeVisible();
+    const railBox = await rail.boundingBox();
+    expect(railBox).not.toBeNull();
+    expect(railBox!.x + railBox!.width).toBeLessThanOrEqual(Math.round(box!.x) + 1);
+    await expect(page.locator('[data-testid="nav-monitor"]')).toBeVisible();
 
     // The run stays mounted behind the scrim.
     await expect(page.locator('[data-testid="stage-rail"]')).toBeAttached();
@@ -79,7 +88,13 @@ test.describe('Settings Screen', () => {
     expect(fits.saveInViewport).toBe(true);
     expect(fits.overflow).toBeLessThanOrEqual(4);
 
-    // Closing dismisses the drawer without navigating away.
+    // Escape dismisses, like any dialog.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-testid="settings-drawer"]')).toHaveCount(0);
+
+    // Reopen and close via the X; the Monitor is still there, not reloaded.
+    await page.locator('[data-testid="nav-settings"]').click();
+    await expect(page.locator('[data-testid="settings-drawer"]')).toBeVisible();
     await page.locator('[data-testid="settings-close"]').click();
     await expect(page.locator('[data-testid="settings-drawer"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="stage-rail"]')).toBeVisible();

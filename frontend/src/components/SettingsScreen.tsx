@@ -10,6 +10,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onCl
   // Rendered as a modal drawer over the current screen. Closing returns to
   // whatever was behind it; onNavigate is the fallback for direct /settings hits.
   const close = onClose ?? (() => onNavigate('/'));
+
+  // Standard modal manners, none of which were present: Escape dismisses, and
+  // the page behind is locked so scrolling inside the drawer does not drag the
+  // Monitor underneath it.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        (onClose ?? (() => onNavigate('/')))();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [onClose, onNavigate]);
   const [catalog, setCatalog] = useState<ProviderCatalog | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -273,7 +292,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onCl
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-[rgba(10,10,10,.38)]"
+        className="fixed inset-y-0 right-0 left-14 z-40 bg-[rgba(10,10,10,.38)]"
         onClick={close}
         data-testid="settings-scrim"
         aria-hidden="true"
@@ -282,7 +301,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onCl
         role="dialog"
         aria-modal="true"
         aria-label="Settings"
-        className="fixed left-0 top-0 bottom-0 z-50 w-[840px] max-w-[92vw] bg-paper border-r border-ink flex flex-col font-grotesk text-ink"
+        className="fixed left-14 top-0 bottom-0 z-50 w-[840px] max-w-[calc(92vw-3.5rem)] bg-paper border-r border-ink flex flex-col font-grotesk text-ink"
         data-testid="settings-drawer"
       >
         <header className="flex-none h-[56px] border-b border-ink px-6 flex items-center gap-3">
