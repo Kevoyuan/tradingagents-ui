@@ -88,7 +88,13 @@ test.describe('Settings Screen', () => {
     expect(fits.saveInViewport).toBe(true);
     expect(fits.overflow).toBeLessThanOrEqual(4);
 
-    // Escape dismisses, like any dialog.
+    // The gear toggles: pressing it again while Settings is open closes it.
+    await page.locator('[data-testid="nav-settings"]').click();
+    await expect(page.locator('[data-testid="settings-drawer"]')).toHaveCount(0);
+
+    // Escape dismisses too, like any dialog.
+    await page.locator('[data-testid="nav-settings"]').click();
+    await expect(page.locator('[data-testid="settings-drawer"]')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.locator('[data-testid="settings-drawer"]')).toHaveCount(0);
 

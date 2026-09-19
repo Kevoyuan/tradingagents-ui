@@ -235,10 +235,20 @@ export const App: React.FC = () => {
   const isReportsIndex = currentPath === '/reports' || currentPath === '/reports/';
   const isSettings = currentPath === '/settings' || currentPath.startsWith('/settings');
 
+  // The gear toggles: pressing it while Settings is already open closes it,
+  // rather than being a no-op because it navigates to the path you are on.
+  const navigateFromRail = (to: string) => {
+    if (to === '/settings' && isSettings) {
+      navigate('/');
+      return;
+    }
+    navigate(to);
+  };
+
   return (
     <div className="grid grid-cols-[56px_minmax(0,1fr)] min-h-screen bg-page font-grotesk antialiased">
       {/* 56px icon rail */}
-      <IconRail currentPath={currentPath} onNavigate={navigate} />
+      <IconRail currentPath={currentPath} onNavigate={navigateFromRail} />
 
       {/* Screen container */}
       {reportMatch ? (
