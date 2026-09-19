@@ -551,14 +551,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onCl
                           data-testid={`cred-input-${field.env_name}`}
                           type={isRevealed ? 'text' : 'password'}
                           value={currentValue}
-                          placeholder={isConfigured ? `(Existing: ${hintInfo.hint}) - leave blank to keep` : field.placeholder}
+                          placeholder={field.placeholder}
                           onChange={(e) =>
                             setCredentialValues((prev) => ({
                               ...prev,
                               [field.env_name]: e.target.value,
                             }))
                           }
-                          className="w-full pr-16 px-3 py-1.5 border border-rule font-grotesk text-sm text-ink bg-page/30 focus:outline-none focus:border-ink"
+                          className="w-full pr-16 px-3 py-1.5 border border-ink font-grotesk text-sm text-ink bg-paper focus:outline-none focus:ring-1 focus:ring-ink"
                         />
                         <button
                           type="button"
@@ -573,6 +573,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onNavigate, onCl
                           {isRevealed ? 'Hide' : 'Show'}
                         </button>
                       </div>
+                      <p className="text-[11px] text-mut mt-1.5" data-testid={`cred-hint-${field.env_name}`}>
+                        {isConfigured
+                          ? `已保存 ${hintInfo.hint} — 留空则保持不变，填入新值则覆盖`
+                          : '尚未配置 — 在此粘贴 API key'}
+                      </p>
                     </div>
                   );
                 })}
