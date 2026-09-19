@@ -446,33 +446,77 @@ class UpstreamRunner:
                 asset_type = detect_asset_type(ticker)
                 cancelled = False
 
-                # The upstream graph keys every chunk by node name, and that key
-                # is the only thing that says which agent produced the messages.
-                # Flattening the chunk threw it away, so every event went out as
-                # agent=None and the UI could only render "System" - the roster,
-                # the five-stage rail and the agent counters never moved.
-                # Slugs are the ones the frontend roster uses (see INITIAL_ROSTER
-                # in App.tsx); note upstream calls the social analyst
-                # "Sentiment Analyst", so this cannot be a string-equality match.
-                node_agents: dict[str, tuple[str, TeamName]] = {
-                    "Market Analyst": ("market", "analyst"),
-                    "Sentiment Analyst": ("social", "analyst"),
-                    "News Analyst": ("news", "analyst"),
-                    "Fundamentals Analyst": ("fundamentals", "analyst"),
-                    "Bull Researcher": ("bull_researcher", "research"),
-                    "Bear Researcher": ("bear_researcher", "research"),
+                # Upstream runs with stream_mode="values"
+                # (tradingagents/graph/propagation.py), so every chunk is the full
+                # AgentState dict. There are NO node-keyed chunks, which is why an
+                # earlier attempt to map chunk keys to agents never matched once:
+                # every event went out as agent=None and the UI rendered "System".
+                #
+                # The real signal is state field transitions, the same one the
+                # retired Streamlit UI used. A report field going non-empty means
+                # that agent finished; the debate states name their latest speaker.
+                # Slugs match the frontend roster (INITIAL_ROSTER in App.tsx).
+                report_agents: dict[str, tuple[str, TeamName]] = {
+                    "market_report": ("market", "analyst"),
+                    "sentiment_report": ("social", "analyst"),
+                    "news_report": ("news", "analyst"),
+                    "fundamentals_report": ("fundamentals", "analyst"),
+                    "investment_plan": ("research_manager", "research"),
+                    "trader_investment_plan": ("trader", "trading"),
+                    "final_trade_decision": ("portfolio_manager", "portfolio"),
+                }
+                debate_speakers: dict[str, tuple[str, TeamName]] = {
+                    "Bull": ("bull_researcher", "research"),
+                    "Bear": ("bear_researcher", "research"),
                     "Research Manager": ("research_manager", "research"),
-                    "Trader": ("trader", "trading"),
-                    "Aggressive Analyst": ("aggressive_analyst", "risk"),
-                    "Neutral Analyst": ("neutral_analyst", "risk"),
-                    "Conservative Analyst": ("conservative_analyst", "risk"),
-                    "Portfolio Manager": ("portfolio_manager", "portfolio"),
+                    "Aggressive": ("aggressive_analyst", "risk"),
+                    "Neutral": ("neutral_analyst", "risk"),
+                    "Conservative": ("conservative_analyst", "risk"),
+                    "Judge": ("portfolio_manager", "portfolio"),
                 }
                 finished: set[str] = set()
                 last_slug: str | None = None
                 last_team: TeamName | None = None
                 last_text_by_agent: dict[str, str] = {}
                 last_stats_at = 0.0
+                seen_reports: set[str] = set()
+                # An analyst's first assistant message lands BEFORE its report
+                # field is filled, so at that moment no agent has started yet.
+                # Buffer those and hand them to whichever agent starts next.
+                pending_unattributed: list[str] = []
+
+                def start(slug: str, team: TeamName) -> None:
+                    """Mark an agent as running the first time we see it work."""
+                    nonlocal last_slug, last_team
+                    if slug in finished or slug == last_slug:
+                        return
+                    if last_slug is not None:
+                        finish(last_slug)
+                    self.event_bus.publish(
+                        kind="agent_status",
+                        payload={"agent": slug, "status": "running"},
+                        agent=slug,
+                        team=team,
+                    )
+                    last_slug, last_team = slug, team
+                    while pending_unattributed:
+                        text = pending_unattributed.pop(0)
+                        if last_text_by_agent.get(slug) == text:
+                            continue
+                        last_text_by_agent[slug] = text
+                        self.event_bus.publish(
+                            kind="agent_message",
+                            payload={
+                                "text": text,
+                                "model": "upstream",
+                                "tokens_in": 0,
+                                "tokens_out": 0,
+                                "latency_ms": 0,
+                                "cost_usd": None,
+                            },
+                            agent=slug,
+                            team=team,
+                        )
 
                 def finish(slug: str) -> None:
                     if slug not in finished:
@@ -486,54 +530,50 @@ class UpstreamRunner:
                         cancelled = True
                         break
 
-                    # Walk the chunk per node so the node key survives. Unknown
-                    # keys (tool nodes, message-clear nodes) belong to whichever
-                    # agent most recently spoke.
-                    for node, node_value in chunk.items():
-                        resolved_agent = node_agents.get(node)
-                        slug, team = resolved_agent if resolved_agent else (last_slug, last_team)
+                    # Who is working right now, per the state we were just handed.
+                    for field, mapping in report_agents.items():
+                        if chunk.get(field) and field not in seen_reports:
+                            seen_reports.add(field)
+                            start(*mapping)
+                            finish(mapping[0])
 
-                        if resolved_agent and slug not in finished and slug != last_slug:
-                            if last_slug is not None:
-                                finish(last_slug)
-                            self.event_bus.publish(
-                                kind="agent_status",
-                                payload={"agent": slug, "status": "running"},
-                                agent=slug,
-                                team=team,
-                            )
-                            last_slug, last_team = slug, team
+                    for debate_field in ("investment_debate_state", "risk_debate_state"):
+                        debate = chunk.get(debate_field) or {}
+                        speaker = debate.get("latest_speaker") if isinstance(debate, dict) else None
+                        mapping = debate_speakers.get(str(speaker))
+                        if mapping:
+                            start(*mapping)
 
-                        msgs = []
-                        if isinstance(node_value, dict) and "messages" in node_value:
-                            msgs = node_value["messages"]
-                        elif node == "messages" and isinstance(node_value, list):
-                            msgs = node_value
-
-                        for msg in msgs:
-                            content = getattr(msg, "content", str(msg))
-                            if not content or not str(content).strip():
-                                continue
-                            # The graph re-emits the same message on several
-                            # ticks; without this the record showed "SNDK" six
-                            # times and the same sentence five times.
-                            if slug and last_text_by_agent.get(slug) == content:
-                                continue
-                            if slug:
-                                last_text_by_agent[slug] = content
-                            self.event_bus.publish(
-                                kind="agent_message",
-                                payload={
-                                    "text": content,
-                                    "model": "upstream",
-                                    "tokens_in": 0,
-                                    "tokens_out": 0,
-                                    "latency_ms": 0,
-                                    "cost_usd": None,
-                                },
-                                agent=slug,
-                                team=team,
-                            )
+                    slug, team = last_slug, last_team
+                    for msg in chunk.get("messages") or []:
+                        content = getattr(msg, "content", str(msg))
+                        if not content or not str(content).strip():
+                            continue
+                        # The graph re-emits the same message on several ticks;
+                        # without this the record showed "SNDK" six times and the
+                        # same sentence five times.
+                        if slug and last_text_by_agent.get(slug) == content:
+                            continue
+                        if not slug:
+                            if last_text_by_agent.get("__pending__") != content:
+                                last_text_by_agent["__pending__"] = content
+                                pending_unattributed.append(content)
+                            continue
+                        if slug:
+                            last_text_by_agent[slug] = content
+                        self.event_bus.publish(
+                            kind="agent_message",
+                            payload={
+                                "text": content,
+                                "model": "upstream",
+                                "tokens_in": 0,
+                                "tokens_out": 0,
+                                "latency_ms": 0,
+                                "cost_usd": None,
+                            },
+                            agent=slug,
+                            team=team,
+                        )
 
                     # Emit counters from the stats handler. Without this the
                     # upstream path never published stats at all, so LLM calls,

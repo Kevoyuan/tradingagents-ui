@@ -32,17 +32,30 @@ class _Token:
 
 
 class _Adapter:
-    """Fake streaming adapter: chunks keyed by upstream node name."""
+    """Fake streaming adapter shaped like the real one.
+
+    Upstream runs with stream_mode="values", so every chunk is the full
+    AgentState dict. An earlier version of this fake emitted node-keyed chunks,
+    which is a shape the real stream never produces - the tests stayed green
+    while the shipped code matched nothing.
+    """
 
     def __init__(self, *_a, **_k) -> None:
         pass
 
     def stream(self, *_a, **_k):
-        yield {"Market Analyst": {"messages": [SimpleNamespace(content="SNDK")]}}
-        yield {"Market Analyst": {"messages": [SimpleNamespace(content="SNDK")]}}  # duplicate
-        yield {"tools_market": {"messages": [SimpleNamespace(content="price data")]}}
-        yield {"Sentiment Analyst": {"messages": [SimpleNamespace(content="no signal")]}}
-        yield {"Portfolio Manager": {"messages": [SimpleNamespace(content="Rating: Buy")]}}
+        yield {"messages": [SimpleNamespace(content="SNDK")], "market_report": ""}
+        yield {"messages": [SimpleNamespace(content="SNDK")], "market_report": ""}  # duplicate
+        yield {"messages": [SimpleNamespace(content="price data")], "market_report": "full report"}
+        yield {
+            "messages": [SimpleNamespace(content="bull case")],
+            "investment_debate_state": {"latest_speaker": "Bull"},
+        }
+        yield {"messages": [SimpleNamespace(content="no signal")], "sentiment_report": "sentiment"}
+        yield {
+            "messages": [SimpleNamespace(content="Rating: Buy")],
+            "final_trade_decision": "Rating: Buy",
+        }
 
 
 def _run_upstream(monkeypatch, tmp_path: Path) -> _Bus:
@@ -112,12 +125,18 @@ def test_upstream_messages_carry_agent_and_status(monkeypatch, tmp_path: Path) -
     assert "social" in slugs
     assert "market" in slugs
     assert "portfolio_manager" in slugs
+    assert "bull_researcher" in slugs
     assert all(e["payload"]["status"] in ("running", "done") for e in statuses)
     assert all(e["agent"] == e["payload"]["agent"] for e in statuses)
 
     messages = [e for e in bus.events if e["kind"] == "agent_message"]
     assert all(e["agent"] is not None for e in messages), "no message may be unattributed"
-    assert {e["agent"] for e in messages} == {"market", "social", "portfolio_manager"}
+    assert {e["agent"] for e in messages} == {
+        "market",
+        "bull_researcher",
+        "social",
+        "portfolio_manager",
+    }
     assert all(e["team"] is not None for e in messages)
 
 
@@ -133,16 +152,19 @@ def test_repeated_message_content_is_not_published_twice(monkeypatch, tmp_path: 
     assert "price data" in market_texts
 
 
-def test_tool_node_message_attributes_to_the_agent_that_spoke_last(
+def test_debate_speaker_attribution_follows_latest_speaker(
     monkeypatch, tmp_path: Path
 ) -> None:
+    """During a debate there is no report field to key on; the debate state names
+    who is speaking, and that is what attributes the message."""
     bus = _run_upstream(monkeypatch, tmp_path)
-    tool_msg = [
+    bull_msg = [
         e for e in bus.events
-        if e["kind"] == "agent_message" and e["payload"]["text"] == "price data"
+        if e["kind"] == "agent_message" and e["payload"]["text"] == "bull case"
     ]
-    assert len(tool_msg) == 1
-    assert tool_msg[0]["agent"] == "market"
+    assert len(bull_msg) == 1
+    assert bull_msg[0]["agent"] == "bull_researcher"
+    assert bull_msg[0]["team"] == "research"
 
 
 def test_upstream_run_publishes_stats(monkeypatch, tmp_path: Path) -> None:
