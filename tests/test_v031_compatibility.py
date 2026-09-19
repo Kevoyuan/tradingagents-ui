@@ -6,8 +6,8 @@ import pytest
 
 from provider_migrations import migrate_provider_preferences
 from tradingagents_adapter import TradingAgentsAdapter, detect_asset_type
-from tradingagents_compat import TRADINGAGENTS_TARGET_TAG, tagged_install_requirement, tradingagents_compatibility
-from ui_config import PROVIDER_API_KEY_ENV, PROVIDER_RUNTIME, PROVIDERS
+from tradingagents_compat import tradingagents_compatibility
+from ui_config import PROVIDER_API_KEY_ENV, PROVIDERS
 
 
 def test_native_provider_ids_align_with_v031():
@@ -41,34 +41,6 @@ def test_kimi_and_custom_openai_preferences_migrate_once():
     again, second_notes = migrate_provider_preferences({**migrated, "llm_provider": "kimi"})
     assert again["llm_provider"] == "kimi"
     assert second_notes == []
-
-
-def test_legacy_custom_openai_uses_native_runtime():
-    assert PROVIDER_RUNTIME["custom_openai"] == "openai_compatible"
-    import app
-
-    runtime, base_url, env = app.get_runtime_llm_config(
-        "custom_openai",
-        {
-            "CUSTOM_OPENAI_API_KEY": "test-placeholder",
-            "CUSTOM_OPENAI_BASE_URL": "http://localhost:1234/v1",
-        },
-    )
-    assert runtime == "openai_compatible"
-    assert base_url == "http://localhost:1234/v1"
-    assert env["OPENAI_COMPATIBLE_API_KEY"] == "test-placeholder"
-
-
-def test_update_installs_exact_tag(monkeypatch):
-    import app
-
-    calls = []
-    monkeypatch.setattr(app.subprocess, "run", lambda args, **kwargs: calls.append(args) or SimpleNamespace())
-    ok, message = app.update_tradingagents_from_app({})
-    assert ok
-    assert TRADINGAGENTS_TARGET_TAG in message
-    assert calls[0][-2] == tagged_install_requirement()
-    assert calls[0][-2].endswith("@v0.3.1")
 
 
 @pytest.mark.parametrize("ticker", ["BTC-USD", "ETH-USD", "SOL/USDT"])

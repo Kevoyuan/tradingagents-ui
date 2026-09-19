@@ -8,14 +8,17 @@ bash scripts/build-frontend.sh
 pytest tests/
 pytest tradingagents_contract/
 ruff check .
-mypy app.py ui_config.py ui_panels.py ui_styles.py trade_ui/
+mypy ui_config.py trade_ui/
 ```
 
-Run locally with `./run.sh` or `trade-ui --port 9000` (or `trade-ui --legacy` for Streamlit).
+Run locally with `./run.sh` or `trade-ui --port 9000`. Build the frontend once with `bash scripts/build-frontend.sh`.
 
 ## Architecture
 
-- `app.py`: Streamlit composition, live progress and report browser
+- `trade_ui/cli.py`: launcher; serves the built SPA and API over uvicorn
+- `trade_ui/server/`: FastAPI app, run registry, event bus, SSE, providers, credentials
+- `frontend/`: React + Vite + TypeScript UI
+- `trade_ui/report_index.py`: report section parser and verdict extraction
 - `tradingagents_adapter.py`: v0.3.1 streaming/checkpoint lifecycle adapter
 - `tradingagents_compat.py`: supported version range and exact tag install helpers
 - `provider_migrations.py`: backward-compatible Provider preference migrations
@@ -27,7 +30,6 @@ Run locally with `./run.sh` or `trade-ui --port 9000` (or `trade-ui --legacy` fo
 ## Environment variables
 
 - `TRADINGAGENTS_UI_LOCAL=1`: enable local API key persistence
-- `TRADINGAGENTS_UI_APP_PATH`: override the Streamlit entrypoint
 - `TRADINGAGENTS_UI_PYTHON_VERSION`: launcher bootstrap Python version
 - `TRADINGAGENTS_DIR`: use a local upstream checkout
 - `TRADINGAGENTS_UI_PORT` and `TRADINGAGENTS_UI_HOST`: launcher network settings

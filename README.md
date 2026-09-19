@@ -1,6 +1,6 @@
 # TradingAgents UI
 
-A local Streamlit desktop-style interface for running [TradingAgents](https://github.com/TauricResearch/TradingAgents) analyses and reading the resulting reports.
+A local web app for running [TradingAgents](https://github.com/TauricResearch/TradingAgents) analyses and reading the resulting reports. The UI is React served by a FastAPI backend; the analysis engine is the upstream `tradingagents` package, unmodified.
 
 [中文说明](README_zh.md)
 
@@ -24,7 +24,6 @@ trade-ui
 ### Launch Modes
 
 - **Default (FastAPI + React)**: Run `trade-ui` to start the new React SPA and FastAPI backend server.
-- **Legacy (Streamlit)**: Run `trade-ui --legacy` to launch the original Streamlit interface (`app.py`).
 
 ### Building the Frontend
 
@@ -95,9 +94,9 @@ Local launchers set local mode. When you save preferences or run an analysis, AP
 ~/.tradingagents/.env
 ```
 
-The file is created with user-only permissions where supported. Keys are not written to this repository or sent to Streamlit Cloud by the UI. They are passed only to the providers selected for the run.
+The file is created with user-only permissions where supported. Keys are not written to this repository by the UI. They are passed only to the providers selected for the run.
 
-Direct Streamlit and cloud deployments use session-only keys unless you configure platform secrets. See [Cloud deployment](docs/cloud-deployment.md).
+Keys live only on this machine, in `~/.tradingagents/.env` (mode 600) and are passed to the selected provider for the duration of a run.
 
 Reports are stored under:
 
@@ -118,7 +117,6 @@ See [COMPATIBILITY.md](COMPATIBILITY.md) for the verified upstream releases and 
 - [Compatibility Matrix](COMPATIBILITY.md)
 - [Installation and alternative launch methods](docs/installation.md)
 - [Providers and credentials](docs/providers.md)
-- [Cloud deployment](docs/cloud-deployment.md)
 - [LAN access](docs/lan-access.md)
 - [Development](docs/development.md)
 

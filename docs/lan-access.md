@@ -6,7 +6,7 @@ Start the LAN launcher:
 ./run-lan.sh
 ```
 
-It binds the Streamlit server to `0.0.0.0`. Open the printed network URL from another device on the same trusted network.
+It binds the app server to `0.0.0.0`. Open the printed network URL from another device on the same trusted network.
 
 LAN mode exposes the UI to other devices that can reach the host. Do not use it on an untrusted network, and do not expose the port directly to the public internet.
 

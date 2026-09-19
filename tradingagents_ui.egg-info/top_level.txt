@@ -1,4 +1,3 @@
-app
 images
 preferences
 provider_migrations
@@ -8,7 +7,4 @@ tools
 trade_ui
 tradingagents_adapter
 tradingagents_compat
-ui_advanced
 ui_config
-ui_panels
-ui_styles

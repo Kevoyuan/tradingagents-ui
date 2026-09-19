@@ -30,14 +30,6 @@ The installed command also accepts a custom port:
 trade-ui --port 9000
 ```
 
-## Direct Streamlit
-
-```bash
-streamlit run app.py
-```
-
-Direct Streamlit does not enable local credential persistence. Use the launcher or `trade-ui` for the normal local experience.
-
 ## Bedrock extra
 
 ```bash

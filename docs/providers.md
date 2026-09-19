@@ -10,7 +10,7 @@ Legacy `custom_openai` preferences migrate automatically to `openai_compatible`.
 
 ## Credentials
 
-Provider API keys are entered in the sidebar. Local mode stores them in `~/.tradingagents/.env`; cloud and direct Streamlit sessions keep them in memory unless platform secrets are configured.
+Provider API keys are entered in the Settings drawer (the gear in the left rail). They are stored in `~/.tradingagents/.env` with mode 600 and passed to the selected provider only for the duration of a run. The API never returns a stored key; the settings UI shows a masked hint instead.
 
 Amazon Bedrock supports `AWS_BEARER_TOKEN_BEDROCK` or the normal AWS credential chain, plus `AWS_DEFAULT_REGION` and optional `AWS_PROFILE`. Install the Bedrock extra first.
 

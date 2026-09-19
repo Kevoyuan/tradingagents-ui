@@ -6,7 +6,6 @@ import pytest
 
 from reporting_adapter import save_ui_reports
 from runtime_environment import effective_environment, temporary_environment
-from ui_advanced import DEFAULT_DATA_VENDORS, SUPPORTED_DATA_VENDORS
 
 
 @pytest.mark.parametrize("ticker", ["../../../tmp/file", "..", "...", "AAPL/../../x", "A" * 33])
@@ -29,12 +28,6 @@ def test_safe_ticker_writes_only_below_results_root(tmp_path, ticker):
     assert report_dir.is_relative_to(tmp_path)
     assert (report_dir / "complete_report.md").is_file()
     assert "Trading Analysis Report" in complete
-
-
-def test_data_vendors_use_only_upstream_supported_values():
-    for category, configured in DEFAULT_DATA_VENDORS.items():
-        assert configured in SUPPORTED_DATA_VENDORS[category]
-        assert configured != "disabled"
 
 
 def test_environment_restores_existing_values_after_success(monkeypatch):
@@ -78,62 +71,6 @@ def test_sidebar_then_secret_then_process_precedence(capsys):
     assert values == {"TOKEN": "sidebar-secret"}
     assert capsys.readouterr().out == ""
     assert capsys.readouterr().err == ""
-
-
-def test_streamlit_secret_lookup_does_not_log_values(capsys):
-    import app
-
-    values = app.get_streamlit_secret_values({"OPENAI_API_KEY": "secret-value"})
-    assert values["OPENAI_API_KEY"] == "secret-value"
-    output = capsys.readouterr()
-    assert "secret-value" not in output.out
-    assert "secret-value" not in output.err
-
-
-@pytest.mark.parametrize(
-    ("version", "update_available", "notice"),
-    [
-        ("0.3.1", False, False),
-        ("0.3.2", False, False),
-        ("0.3.9", False, False),
-        ("0.3.0", True, True),
-        ("0.4.0", False, True),
-    ],
-)
-def test_update_status_never_downgrades_compatible_versions(monkeypatch, version, update_available, notice):
-    import app
-
-    app.cached_tradingagents_update_status.clear()
-    monkeypatch.setattr(app, "find_tradingagents_checkout", lambda: None)
-    monkeypatch.setattr(app, "is_tradingagents_installed", lambda: True)
-    monkeypatch.setattr(app, "installed_tradingagents_version", lambda: version)
-    monkeypatch.setattr(app, "latest_remote_tradingagents_tag", lambda: "v0.3.1")
-    status = app.cached_tradingagents_update_status()
-    assert status["update_available"] is update_available
-    assert bool(status.get("notice")) is notice
-    app.cached_tradingagents_update_status.clear()
-
-
-def test_local_checkout_update_never_mutates_worktree(tmp_path, monkeypatch):
-    import app
-
-    monkeypatch.setattr(app, "checkout_has_local_changes", lambda _path: False)
-    ok, message = app.update_tradingagents_from_app({"path": str(tmp_path)})
-    assert not ok
-    assert "left unchanged" in message
-
-
-def test_missing_tradingagents_offers_target_install(monkeypatch):
-    import app
-
-    app.cached_tradingagents_update_status.clear()
-    monkeypatch.setattr(app, "find_tradingagents_checkout", lambda: None)
-    monkeypatch.setattr(app, "is_tradingagents_installed", lambda: False)
-    monkeypatch.setattr(app, "latest_remote_tradingagents_tag", lambda: "v0.3.1")
-    status = app.cached_tradingagents_update_status()
-    assert status["installed_version"] == "missing"
-    assert status["update_available"] is True
-    app.cached_tradingagents_update_status.clear()
 
 
 def test_ui_version_is_package_metadata():
