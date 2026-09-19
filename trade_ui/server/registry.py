@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 from trade_ui.server.config import ServerSettings
 from trade_ui.server.event_bus import EventBus
@@ -72,9 +74,20 @@ class RunRegistry:
         hijack the Monitor permanently - which is exactly what happened, the
         UI sat on a dead run from a previous process while the user pressed
         Start and nothing moved.
+
+        Two limits on that, both learned from a real run:
+
+        - The completion time is taken from the run's own last event, never from
+          the clock at startup. Stamping "now" produced runs whose completed_at
+          preceded their own final event by minutes, which is impossible and
+          breaks anything that orders or measures runs by time.
+        - A run whose log moved in the last minute is left alone. Its owning
+          process is probably still alive (two servers sharing a runs
+          directory); marking it failed would clobber a healthy run.
         """
         if not self.runs_dir.is_dir():
             return
+        now = time.time()
         for child in self.runs_dir.iterdir():
             run_file = child / "run.json"
             if not run_file.is_file():
@@ -83,17 +96,47 @@ class RunRegistry:
                 header = RunHeader.model_validate_json(run_file.read_text(encoding="utf-8"))
             except Exception:
                 continue
-            if header.status in ("running", "pending"):
-                header.status = "failed"
-                header.completed_at = header.completed_at or time.strftime(
-                    "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
-                )
-                # Persist inline rather than via _save_header, which takes the
-                # lock and is not yet safe to use from __init__.
+            if header.status not in ("running", "pending"):
+                continue
+
+            last_ts = self._last_event_timestamp(child / "events.jsonl")
+            if last_ts is not None:
                 try:
-                    run_file.write_text(header.model_dump_json(indent=2), encoding="utf-8")
-                except OSError:
-                    continue
+                    if now - datetime.fromisoformat(last_ts).timestamp() < 60:
+                        continue
+                except ValueError:
+                    pass
+
+            header.status = "failed"
+            header.completed_at = last_ts or header.completed_at
+            # Persist inline rather than via _save_header, which takes the lock
+            # and is not yet safe to use from __init__.
+            try:
+                run_file.write_text(header.model_dump_json(indent=2), encoding="utf-8")
+            except OSError:
+                continue
+
+    @staticmethod
+    def _last_event_timestamp(events_file: Path) -> str | None:
+        """Read the final event's timestamp without loading the whole log."""
+        if not events_file.is_file():
+            return None
+        try:
+            with open(events_file, "rb") as handle:
+                handle.seek(0, os.SEEK_END)
+                size = handle.tell()
+                handle.seek(max(0, size - 8192))
+                tail = handle.read().decode("utf-8", "replace").strip().splitlines()
+        except OSError:
+            return None
+        for line in reversed(tail):
+            try:
+                value = json.loads(line).get("ts")
+            except (json.JSONDecodeError, AttributeError):
+                continue
+            if isinstance(value, str) and value:
+                return value
+        return None
 
     def has_active_run(self) -> bool:
         """Check whether a run is currently in progress."""
