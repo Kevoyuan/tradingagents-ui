@@ -392,6 +392,33 @@ class UpstreamRunner:
         trade_date = self.header.trade_date
         config_dict = self.config.model_dump()
 
+        from runtime_environment import temporary_environment
+        from trade_ui.server.run_config import resolve_run_config
+
+        resolved = resolve_run_config(self.config)
+        if resolved.missing_credentials:
+            missing_str = ", ".join(resolved.missing_credentials)
+            err_msg = (
+                f"Missing required credentials for provider '{resolved.provider}': {missing_str}. "
+                f"Please configure them in ~/.tradingagents/.env or Settings."
+            )
+            logger.error("Run %s rejected: %s", self.header.run_id, err_msg)
+            self.header.status = "failed"
+            self.header.started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            self.header.completed_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            self.header.error = {"message": err_msg, "traceback": ""}
+            self.on_header_update(self.header)
+            self.event_bus.publish(
+                kind="error",
+                payload={"message": err_msg, "traceback": ""},
+            )
+            self.event_bus.publish(
+                kind="run_state",
+                payload={"status": "failed", "ticker": ticker, "trade_date": trade_date, "config": config_dict},
+            )
+            self.event_bus.close()
+            return
+
         try:
             self.header.status = "running"
             self.header.started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -401,62 +428,78 @@ class UpstreamRunner:
                 payload={"status": "running", "ticker": ticker, "trade_date": trade_date, "config": config_dict},
             )
 
-            from cli.stats_handler import StatsCallbackHandler
-            from tradingagents.graph.trading_graph import TradingAgentsGraph
+            with temporary_environment(resolved.runtime_env_values):
+                from cli.stats_handler import StatsCallbackHandler
+                from tradingagents.graph.trading_graph import TradingAgentsGraph
 
-            from tradingagents_adapter import TradingAgentsAdapter, detect_asset_type
+                from tradingagents_adapter import TradingAgentsAdapter, detect_asset_type
 
-            analysts = self.config.analysts or ["market", "social", "news", "fundamentals"]
-            stats_handler = StatsCallbackHandler()
-            graph = TradingAgentsGraph(analysts, config=self.config.config, debug=False, callbacks=[stats_handler])
-            runner = TradingAgentsAdapter(graph, callbacks=[stats_handler])
+                analysts = resolved.analysts
+                stats_handler = StatsCallbackHandler()
+                graph = TradingAgentsGraph(
+                    analysts,
+                    config=resolved.upstream_config,
+                    debug=False,
+                    callbacks=[stats_handler],
+                )
+                runner = TradingAgentsAdapter(graph, callbacks=[stats_handler])
 
-            asset_type = detect_asset_type(ticker)
-            cancelled = False
+                asset_type = detect_asset_type(ticker)
+                cancelled = False
 
-            for chunk in runner.stream(ticker, trade_date, asset_type=asset_type):
-                if self.cancel_token.is_cancelled:
-                    cancelled = True
-                    break
+                for chunk in runner.stream(ticker, trade_date, asset_type=asset_type):
+                    if self.cancel_token.is_cancelled:
+                        cancelled = True
+                        break
 
-                # Extract messages and states from chunk
-                msgs = []
-                if "messages" in chunk:
-                    msgs = chunk["messages"]
-                else:
-                    for val in chunk.values():
-                        if isinstance(val, dict) and "messages" in val:
-                            msgs.extend(val["messages"])
+                    # Extract messages and states from chunk
+                    msgs = []
+                    if "messages" in chunk:
+                        msgs = chunk["messages"]
+                    else:
+                        for val in chunk.values():
+                            if isinstance(val, dict) and "messages" in val:
+                                msgs.extend(val["messages"])
 
-                for msg in msgs:
-                    content = getattr(msg, "content", str(msg))
+                    for msg in msgs:
+                        content = getattr(msg, "content", str(msg))
+                        self.event_bus.publish(
+                            kind="agent_message",
+                            payload={
+                                "text": content,
+                                "model": "upstream",
+                                "tokens_in": 0,
+                                "tokens_out": 0,
+                                "latency_ms": 0,
+                                "cost_usd": None,
+                            },
+                        )
+
+                if cancelled or self.cancel_token.is_cancelled:
                     self.event_bus.publish(
-                        kind="agent_message",
+                        kind="run_state",
                         payload={
-                            "text": content,
-                            "model": "upstream",
-                            "tokens_in": 0,
-                            "tokens_out": 0,
-                            "latency_ms": 0,
-                            "cost_usd": None,
+                            "status": "cancelled",
+                            "ticker": ticker,
+                            "trade_date": trade_date,
+                            "config": config_dict,
                         },
                     )
+                    self.header.status = "cancelled"
+                else:
+                    self.event_bus.publish(
+                        kind="run_state",
+                        payload={
+                            "status": "completed",
+                            "ticker": ticker,
+                            "trade_date": trade_date,
+                            "config": config_dict,
+                        },
+                    )
+                    self.header.status = "completed"
 
-            if cancelled or self.cancel_token.is_cancelled:
-                self.event_bus.publish(
-                    kind="run_state",
-                    payload={"status": "cancelled", "ticker": ticker, "trade_date": trade_date, "config": config_dict},
-                )
-                self.header.status = "cancelled"
-            else:
-                self.event_bus.publish(
-                    kind="run_state",
-                    payload={"status": "completed", "ticker": ticker, "trade_date": trade_date, "config": config_dict},
-                )
-                self.header.status = "completed"
-
-            self.header.completed_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-            self.on_header_update(self.header)
+                self.header.completed_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                self.on_header_update(self.header)
 
         except Exception as err:
             logger.exception("Error in UpstreamRunner execution: %s", err)

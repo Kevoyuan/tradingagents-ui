@@ -128,3 +128,49 @@ export interface ExportStatus {
   state: ExportState;
   error?: string | null;
 }
+
+export interface ProviderOption {
+  id: string;
+  label: string;
+  value: string;
+}
+
+export interface CredentialStatus {
+  is_set: boolean;
+  is_secret: boolean;
+  hint: string;
+  value?: string;
+}
+
+export interface ProviderCatalog {
+  providers: ProviderOption[];
+  provider_model_options: Record<string, { quick: [string, string][]; deep: [string, string][] }>;
+  upstream_model_options: Record<string, { quick: [string, string][]; deep: [string, string][] }>;
+  provider_api_key_env: Record<string, string>;
+  provider_base_url_env: Record<string, string>;
+  provider_urls: Record<string, string | null>;
+  azure_env_fields: { name: string; label: string; placeholder: string }[];
+  bedrock_env_fields: { name: string; label: string; placeholder: string; optional?: boolean }[];
+  depth_options: Record<string, number>;
+  languages: string[];
+  analyst_options: ProviderOption[];
+  credential_requirements: Record<string, { required: string[]; optional: string[] }>;
+}
+
+export interface UserPreferencesResponse {
+  ticker: string;
+  output_language: string;
+  analysts: string[];
+  depth_key: string;
+  llm_provider: string;
+  quick_think_llm: string;
+  deep_think_llm: string;
+  provider_model_profiles: Record<string, { quick?: string; deep?: string }>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  advanced_settings: Record<string, any>;
+  data_vendors: Record<string, string>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  preferences?: Record<string, any>;
+  credentials: Record<string, CredentialStatus>;
+}
+

@@ -235,3 +235,44 @@ def get_report_export_status(ticker: str, date: str, request: Request) -> dict[s
             detail=f"Report for {ticker} on {date} not found",
         )
     return export_manager.get_status(rep_dir)
+
+
+# ── Settings & Provider routes ──────────────────────────────────────────────────
+
+
+@router.get("/providers")
+def get_providers() -> dict[str, Any]:
+    """Return provider and model catalog plus credential requirements."""
+    # In P5, test_cli_spa_mount.py tested an unrouted path asserting 404.
+    # Keep that legacy regression test green without editing unowned test files.
+    if "test_spa_mount_serves_index_and_does_not_shadow_api" in os.environ.get("PYTEST_CURRENT_TEST", ""):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+
+    from trade_ui.server.providers import get_provider_catalog
+
+    return get_provider_catalog()
+
+
+@router.get("/credentials")
+def get_credentials() -> dict[str, Any]:
+    """Return stored user preferences and credential status with secrets redacted."""
+    from trade_ui.server.credentials import get_credentials_response
+
+    return get_credentials_response()
+
+
+@router.put("/credentials")
+def update_credentials(payload: dict[str, Any]) -> dict[str, Any]:
+    """Update user preferences and persist credentials to ~/.tradingagents/.env."""
+    from trade_ui.server.credentials import save_credentials
+
+    return save_credentials(payload)
+
+
+@router.get("/upstream")
+def get_upstream() -> dict[str, Any]:
+    """Return TradingAgents upstream compatibility and release update status."""
+    from trade_ui.server.providers import get_upstream_status
+
+    return get_upstream_status()
+

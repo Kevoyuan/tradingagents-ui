@@ -81,6 +81,13 @@ export function useRun(initialRunId?: string | null) {
     tradeDate?: string;
     useStub?: boolean;
     stepDelay?: number;
+    provider?: string;
+    quickModel?: string;
+    deepModel?: string;
+    depth?: number;
+    analysts?: string[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    config?: Record<string, any>;
   }) => {
     setIsLoading(true);
     setError(null);
@@ -91,8 +98,14 @@ export function useRun(initialRunId?: string | null) {
         body: JSON.stringify({
           ticker: params.ticker,
           trade_date: params.tradeDate || new Date().toISOString().split('T')[0],
-          use_stub: params.useStub !== undefined ? params.useStub : true,
+          use_stub: params.useStub !== undefined ? params.useStub : false,
           step_delay: params.stepDelay !== undefined ? params.stepDelay : 0.0,
+          provider: params.provider,
+          quick_model: params.quickModel,
+          deep_model: params.deepModel,
+          depth: params.depth,
+          analysts: params.analysts,
+          config: params.config || {},
         }),
       });
 

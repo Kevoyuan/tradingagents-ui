@@ -6,8 +6,9 @@ interface IconRailProps {
 }
 
 export const IconRail: React.FC<IconRailProps> = ({ currentPath = '/', onNavigate }) => {
-  const isReports = currentPath.startsWith('/reports');
-  const isMonitor = !isReports;
+  const isSettings = currentPath === '/settings' || currentPath.startsWith('/settings');
+  const isReports = !isSettings && currentPath.startsWith('/reports');
+  const isMonitor = !isReports && !isSettings;
 
   return (
     <nav
@@ -67,9 +68,19 @@ export const IconRail: React.FC<IconRailProps> = ({ currentPath = '/', onNavigat
 
       {/* Settings Icon */}
       <a
-        href="#"
+        href="/settings"
+        aria-current={isSettings ? 'page' : undefined}
         title="Settings"
-        className="w-9 h-9 grid place-items-center text-[#7c786f] hover:text-white transition-colors"
+        onClick={(e) => {
+          if (onNavigate) {
+            e.preventDefault();
+            onNavigate('/settings');
+          }
+        }}
+        className={`w-9 h-9 grid place-items-center transition-colors ${
+          isSettings ? 'text-white' : 'text-[#7c786f] hover:text-white'
+        }`}
+        data-testid="nav-settings"
       >
         <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6">
           <circle cx="10" cy="10" r="2.6" />

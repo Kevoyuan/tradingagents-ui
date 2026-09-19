@@ -8,6 +8,7 @@ import { RightRail } from './components/RightRail';
 import { RunLauncherModal } from './components/RunLauncherModal';
 import { ReportsIndexScreen } from './components/ReportsIndexScreen';
 import { ReportDetailScreen } from './components/ReportDetailScreen';
+import { SettingsScreen } from './components/SettingsScreen';
 import { useRun } from './hooks/useRun';
 import { useRunEvents } from './hooks/useRunEvents';
 import { AgentInfo, AgentStatus, StageInfo, TeamName, Verdict } from './types';
@@ -232,6 +233,7 @@ export const App: React.FC = () => {
 
   const reportMatch = currentPath.match(/^\/reports\/([^/]+)\/([^/]+)/);
   const isReportsIndex = currentPath === '/reports' || currentPath === '/reports/';
+  const isSettings = currentPath === '/settings' || currentPath.startsWith('/settings');
 
   return (
     <div className="grid grid-cols-[56px_minmax(0,1fr)] min-h-screen bg-page font-grotesk antialiased">
@@ -307,6 +309,10 @@ export const App: React.FC = () => {
           />
         </div>
       )}
+
+      {/* Settings opens as a modal drawer over whatever is behind it, so a
+          running analysis stays mounted and visible through the scrim. */}
+      {isSettings && <SettingsScreen onNavigate={navigate} onClose={() => navigate('/')} />}
     </div>
   );
 };
