@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import { RunEvent, ToolEvidenceItem } from '../types';
+import { AgentMessageBody } from './AgentMessageBody';
 import { ToolEvidence } from './ToolEvidence';
 
 interface TheRecordProps {
@@ -125,9 +126,7 @@ export const TheRecord: React.FC<TheRecordProps> = ({ events }) => {
                     </div>
                   </div>
                   <div className="mt-2.5 pl-[86px] text-[15px] leading-[1.74] text-ink-2 prose prose-sm max-w-none">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
-                      {evt.payload?.text || ''}
-                    </ReactMarkdown>
+                    <AgentMessageBody text={evt.payload?.text || ''} />
                   </div>
                 </article>
               );
