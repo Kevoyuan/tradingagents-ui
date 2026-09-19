@@ -31,12 +31,20 @@ func showLaunchError() {
 }
 
 func serverIsHealthy(client *http.Client) bool {
-	response, err := client.Get("http://localhost:8501/_stcore/health")
+	response, err := client.Get(healthURL())
 	if err != nil {
 		return false
 	}
 	defer response.Body.Close()
 	return response.StatusCode >= 200 && response.StatusCode < 300
+}
+
+func healthURL() string {
+	port := os.Getenv("TRADINGAGENTS_UI_PORT")
+	if port == "" {
+		port = "8501"
+	}
+	return fmt.Sprintf("http://localhost:%s/_stcore/health", port)
 }
 
 func main() {
@@ -71,13 +79,16 @@ func main() {
 	}
 
 	client := &http.Client{Timeout: 2 * time.Second}
-	missedChecks := 0
-	for missedChecks < 10 {
-		time.Sleep(3 * time.Second)
+	// Exit as soon as the server is up so LaunchServices does not treat the
+	// app as running forever, which makes later double-clicks a no-op.
+	deadline := time.Now().Add(45 * time.Second)
+	for time.Now().Before(deadline) {
 		if serverIsHealthy(client) {
-			missedChecks = 0
-		} else {
-			missedChecks++
+			// Give the launch script a moment to bring the browser window up
+			// before this process exits.
+			time.Sleep(2 * time.Second)
+			return
 		}
+		time.Sleep(2 * time.Second)
 	}
 }

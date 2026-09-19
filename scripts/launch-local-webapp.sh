@@ -51,7 +51,17 @@ if [[ "${HEALTHY}" != true ]]; then
 fi
 
 if [ -d "/Applications/Google Chrome.app" ]; then
-  open -na "Google Chrome" --args --app="${URL}" --user-data-dir="${LOG_DIR}/chrome-profile"
+  chrome_has_ui_window="$(osascript \
+    -e 'tell application "Google Chrome" to return (exists (some window whose URL of active tab contains "'"${HOST}:${PORT}"'"))' \
+    2>/dev/null || true)"
+  if [[ "${chrome_has_ui_window}" == "true" ]]; then
+    osascript \
+      -e 'tell application "Google Chrome" to set index of (some window whose URL of active tab contains "'"${HOST}:${PORT}"'") to 1' \
+      >/dev/null 2>&1 || true
+    open -a "Google Chrome"
+  else
+    open -na "Google Chrome" --args --app="${URL}" --user-data-dir="${LOG_DIR}/chrome-profile"
+  fi
 elif [ -d "/Applications/Microsoft Edge.app" ]; then
   open -na "Microsoft Edge" --args --app="${URL}" --user-data-dir="${LOG_DIR}/edge-profile"
 else

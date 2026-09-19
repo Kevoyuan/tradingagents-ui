@@ -144,9 +144,6 @@ trade_ui/server/providers.py
 trade_ui/server/registry.py
 trade_ui/server/run_config.py
 trade_ui/server/runner.py
-trade_ui/static/index.html
-trade_ui/static/assets/index-BQSHlmEY.css
-trade_ui/static/assets/index-C-f-PbBM.js
 tradingagents_ui.egg-info/PKG-INFO
 tradingagents_ui.egg-info/SOURCES.txt
 tradingagents_ui.egg-info/dependency_links.txt
