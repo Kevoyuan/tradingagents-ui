@@ -1,6 +1,6 @@
 # Providers
 
-TradingAgents v0.3.1 native providers are shown directly in the UI. Their model lists and API key names are imported from the upstream package where available.
+TradingAgents v0.5.0 native providers are shown directly in the UI. Their model lists and API key names are imported from the upstream package where available.
 
 Native Kimi uses the `kimi` ID and Moonshot's OpenAI-compatible API. The older Kimi Coding Plan remains available as `kimi_coding` and runs through the Anthropic-compatible adapter.
 

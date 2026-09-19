@@ -4,7 +4,7 @@
 
 [English](README.md)
 
-**兼容 TradingAgents v0.3.1**
+**兼容 TradingAgents v0.5.0**
 
 ![TradingAgents UI 实时分析](images/trade-ui-monitor.png)
 
@@ -92,9 +92,9 @@ open "TradingAgents UI.app"
 
 ## TradingAgents 兼容性
 
-当前版本支持 TradingAgents `>=0.3.1,<0.4`，默认安装精确的 `v0.3.1` tag。应用内更新器也会安装提示中显示的同一个 tag。
+当前版本支持 TradingAgents `>=0.5.0,<0.6`，默认安装精确的 `v0.5.0` tag。应用内更新器也会安装提示中显示的同一个 tag。
 
-Provider 元数据和模型选项会尽量直接复用上游 v0.3.1 registry。仅 UI 专用的兼容端点由本项目单独维护。
+Provider 元数据和模型选项会尽量直接复用上游 v0.5.0 registry。仅 UI 专用的兼容端点由本项目单独维护。
 
 ## 文档
 

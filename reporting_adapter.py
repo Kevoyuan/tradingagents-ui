@@ -1,4 +1,4 @@
-"""Safe report persistence built on TradingAgents' v0.3.1 report writer."""
+"""Safe report persistence built on the upstream TradingAgents report writer."""
 
 from __future__ import annotations
 

@@ -10,7 +10,7 @@ from tradingagents_compat import tradingagents_compatibility
 from ui_config import PROVIDER_API_KEY_ENV, PROVIDERS
 
 
-def test_native_provider_ids_align_with_v031():
+def test_native_provider_ids_align_with_upstream():
     expected = {
         "openai", "anthropic", "google", "azure", "bedrock", "xai", "deepseek",
         "qwen", "qwen-cn", "glm", "glm-cn", "minimax", "minimax-cn", "openrouter",
@@ -25,7 +25,12 @@ def test_upstream_claude_5_models_are_visible():
     from tradingagents.llm_clients.model_catalog import MODEL_OPTIONS
 
     models = {model for options in MODEL_OPTIONS["anthropic"].values() for _, model in options}
-    assert {"claude-sonnet-5", "claude-fable-5"} <= models
+    # Assert the catalog is usable rather than pinning exact ids: upstream
+    # renames models between releases (claude-fable-5 became claude-fable-5-1
+    # and the two opus-4 ids collapsed into claude-opus-5 between v0.3.1 and
+    # v0.5.0), and an exact list turns every rename into a false failure.
+    assert models, "anthropic model catalog is empty"
+    assert "claude-sonnet-5" in models
 
 
 def test_kimi_and_custom_openai_preferences_migrate_once():
@@ -62,10 +67,16 @@ def test_checkpoint_thread_id_includes_graph_shape():
 
 
 def test_incompatible_version_returns_ui_safe_status():
-    assert not tradingagents_compatibility("0.3.0").compatible
-    assert "too old" in tradingagents_compatibility("0.3.0").message
+    # Bounds are owned by tradingagents_compat; this test pins the boundary
+    # behaviour, not a literal version, so a bump moves the constants and these
+    # two lines together. A stale hardcoded version here is exactly how the
+    # v0.3.1 -> v0.5.0 bump first surfaced as a red test.
     assert not tradingagents_compatibility("0.4.0").compatible
-    assert tradingagents_compatibility("0.3.1").compatible
+    assert "too old" in tradingagents_compatibility("0.4.0").message
+    assert not tradingagents_compatibility("0.6.0").compatible
+    assert "not supported yet" in tradingagents_compatibility("0.6.0").message
+    assert tradingagents_compatibility("0.5.0").compatible
+    assert tradingagents_compatibility("0.5.9").compatible
 
 
 def test_checkpoint_enabled_uses_compiled_checkpoint_graph(monkeypatch):

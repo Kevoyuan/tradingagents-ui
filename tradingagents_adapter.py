@@ -1,4 +1,4 @@
-"""Streaming adapter that preserves TradingAgents v0.3.1 run semantics."""
+"""Streaming adapter that preserves upstream TradingAgents run semantics."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ def detect_asset_type(ticker: str) -> str:
 class TradingAgentsAdapter:
     """Expose upstream-equivalent initialization as a streaming iterator.
 
-    TradingAgents v0.3.1 has no public callback-based streaming runner. This
+    Upstream TradingAgents has no public callback-based streaming runner. This
     adapter deliberately mirrors its private ``_run_graph`` lifecycle in one
     isolated module so the Streamlit UI can retain live progress.
     """

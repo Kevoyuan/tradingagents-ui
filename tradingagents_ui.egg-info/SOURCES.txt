@@ -18,7 +18,8 @@ tests/test_cli.py
 tests/test_cli_spa_mount.py
 tests/test_release_blockers.py
 tests/test_report_index.py
-tests/test_v031_compatibility.py
+tests/test_run_script_port_guard.py
+tests/test_upstream_compatibility.py
 tools/__init__.py
 tools/baoyu-markdown-to-html/SKILL.md
 tools/baoyu-markdown-to-html/scripts/bun.lock
@@ -131,6 +132,7 @@ tools/baoyu-markdown-to-html/scripts/vendor/baoyu-md/src/themes/simple.css
 tools/baoyu-markdown-to-html/scripts/vendor/baoyu-md/src/utils/languages.ts
 trade_ui/__init__.py
 trade_ui/cli.py
+trade_ui/model_pricing.py
 trade_ui/report_index.py
 trade_ui/server/__init__.py
 trade_ui/server/api.py
@@ -144,6 +146,9 @@ trade_ui/server/providers.py
 trade_ui/server/registry.py
 trade_ui/server/run_config.py
 trade_ui/server/runner.py
+trade_ui/static/index.html
+trade_ui/static/assets/index-CZtndp79.css
+trade_ui/static/assets/index-Cmxt1rsd.js
 tradingagents_ui.egg-info/PKG-INFO
 tradingagents_ui.egg-info/SOURCES.txt
 tradingagents_ui.egg-info/dependency_links.txt

@@ -4,7 +4,7 @@ A local web app for running [TradingAgents](https://github.com/TauricResearch/Tr
 
 [中文说明](README_zh.md)
 
-**Compatible with TradingAgents v0.3.1**
+**Compatible with TradingAgents v0.5.0**
 
 ![TradingAgents UI analysis monitor](images/trade-ui-monitor.png)
 
@@ -108,7 +108,8 @@ The latest complete report is linked at `~/.tradingagents/latest_report.md` when
 
 ## TradingAgents Compatibility
 
-This release supports TradingAgents `>=0.3.1,<0.4` and installs the exact `v0.3.1` tag by default. The in-app updater also installs the tag shown in its update prompt.
+This release supports TradingAgents `>=0.5.0,<0.6` and installs the exact `v0.5.0` tag
+by default. The in-app updater also installs the tag shown in its update prompt.
 
 See [COMPATIBILITY.md](COMPATIBILITY.md) for the verified upstream releases and interface symbol contract matrix.
 

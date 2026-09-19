@@ -7,9 +7,20 @@ import re
 from dataclasses import dataclass
 
 TRADINGAGENTS_REPO_URL = "https://github.com/TauricResearch/TradingAgents.git"
-TRADINGAGENTS_TARGET_TAG = "v0.3.1"
-TRADINGAGENTS_MIN_VERSION = (0, 3, 1)
-TRADINGAGENTS_MAX_VERSION = (0, 4, 0)
+TRADINGAGENTS_TARGET_TAG = "v0.5.0"
+TRADINGAGENTS_MIN_VERSION = (0, 5, 0)
+TRADINGAGENTS_MAX_VERSION = (0, 6, 0)
+
+
+def supported_range() -> str:
+    """Render the supported range from the constants so it cannot drift.
+
+    Public because other modules surface the same string to the user; deriving
+    it in one place is what keeps a version bump from leaving stale copy behind.
+    """
+    lo = ".".join(str(part) for part in TRADINGAGENTS_MIN_VERSION)
+    hi = ".".join(str(part) for part in TRADINGAGENTS_MAX_VERSION)
+    return f">={lo},<{hi}"
 
 
 def ui_version() -> str:
@@ -38,19 +49,23 @@ def tradingagents_compatibility(version: str | None = None) -> CompatibilityStat
             version = importlib.metadata.version("tradingagents")
         except importlib.metadata.PackageNotFoundError:
             return CompatibilityStatus(
-                "missing", False, "TradingAgents is not installed. Install compatible version v0.3.1."
+                "missing", False, f"TradingAgents is not installed. Install {supported_range()}."
             )
 
     parsed = version_tuple(version)
     if parsed is None:
         return CompatibilityStatus(
-            version, False, f"Cannot verify TradingAgents version {version!r}. Expected >=0.3.1,<0.4."
+            version, False, f"Cannot verify TradingAgents version {version!r}. Expected {supported_range()}."
         )
     if parsed < TRADINGAGENTS_MIN_VERSION:
-        return CompatibilityStatus(version, False, f"TradingAgents {version} is too old. Install v0.3.1.")
+        return CompatibilityStatus(
+            version,
+            False,
+            f"TradingAgents {version} is too old. Install {TRADINGAGENTS_TARGET_TAG}.",
+        )
     if parsed >= TRADINGAGENTS_MAX_VERSION:
         return CompatibilityStatus(
-            version, False, f"TradingAgents {version} is not supported yet. This UI supports >=0.3.1,<0.4."
+            version, False, f"TradingAgents {version} is not supported yet. This UI supports {supported_range()}."
         )
     return CompatibilityStatus(version, True, f"TradingAgents {version} is compatible.")
 

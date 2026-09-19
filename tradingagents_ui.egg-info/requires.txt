@@ -1,7 +1,7 @@
 fastapi>=0.100.0
 uvicorn>=0.20.0
 python-dotenv>=1.0.0
-tradingagents @ git+https://github.com/TauricResearch/TradingAgents.git@v0.3.1
+tradingagents @ git+https://github.com/TauricResearch/TradingAgents.git@v0.5.0
 
 [bedrock]
 langchain-aws>=1.5.0

@@ -19,7 +19,7 @@ Run locally with `./run.sh` or `trade-ui --port 9000`. Build the frontend once w
 - `trade_ui/server/`: FastAPI app, run registry, event bus, SSE, providers, credentials
 - `frontend/`: React + Vite + TypeScript UI
 - `trade_ui/report_index.py`: report section parser and verdict extraction
-- `tradingagents_adapter.py`: v0.3.1 streaming/checkpoint lifecycle adapter
+- `tradingagents_adapter.py`: upstream streaming/checkpoint lifecycle adapter
 - `tradingagents_compat.py`: supported version range and exact tag install helpers
 - `provider_migrations.py`: backward-compatible Provider preference migrations
 - `ui_config.py`: native and UI-only Provider metadata
@@ -34,4 +34,4 @@ Run locally with `./run.sh` or `trade-ui --port 9000`. Build the frontend once w
 - `TRADINGAGENTS_DIR`: use a local upstream checkout
 - `TRADINGAGENTS_UI_PORT` and `TRADINGAGENTS_UI_HOST`: launcher network settings
 
-The streaming adapter mirrors the upstream v0.3.1 `_run_graph` initialization and cleanup because upstream does not expose a public streaming equivalent of `propagate()`. Keep version-specific private API use isolated in that module.
+The streaming adapter mirrors the upstream `_run_graph` initialization and cleanup because upstream does not expose a public streaming equivalent of `propagate()`. Keep version-specific private API use isolated in that module; the contract suite in `tradingagents_contract/` is what flags an upstream change to the private surface the adapter depends on.

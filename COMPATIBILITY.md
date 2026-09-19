@@ -6,12 +6,31 @@ This document tracks compatibility between `tradingagents-ui` and the upstream [
 
 | TradingAgents Version | Status | CI Contract Suite | Notes |
 |-----------------------|--------|-------------------|-------|
-| `v0.3.1` (Pinned) | Supported & Pinned | Passing | Base target version installed by default in virtual environments. |
-| `v0.5.0` (Latest Tag) | Compatible | Passing | Contract verified; adds optional `portfolio_context` to initial state. |
+| `v0.5.0` (Pinned) | Supported & Pinned | Passing | Target installed by default. The pin moved here from `v0.3.1` after the contract suite and the app's own tests passed against it. |
+| `v0.3.1` (Previous) | Unsupported | Not run in CI | Superseded target. `tradingagents_compatibility()` now reports it as too old, and the app's own suite no longer runs against it. |
+
+Supported range: `>=0.5.0,<0.6`. The range is defined once in
+`tradingagents_compat.py` and rendered from those constants, so user-facing copy
+cannot drift from the pin.
+
+### What changed between `v0.3.1` and `v0.5.0`
+
+The 12 contract assertions pass on both versions, and so did the app's own suite
+once one stale assertion was relaxed. Two things are worth recording:
+
+- **Model ids were renamed, not added.** `claude-fable-5` became
+  `claude-fable-5-1`, and `claude-opus-4-7` / `claude-opus-4-8` collapsed into
+  `claude-opus-5`. A `custom` entry also appeared. A test that asserted an exact
+  model set failed on this rename, which is why it now asserts the catalog is
+  usable and non-empty instead of pinning ids.
+- **`create_initial_state` gained an optional `portfolio_context` argument.**
+  Additive, so the existing call site is unaffected.
 
 ## Symbol Contract Matrix
 
-The following upstream symbols are required by `tradingagents-ui` and asserted by `tradingagents_contract`:
+The following upstream symbols are required by `tradingagents-ui` and asserted by
+`tradingagents_contract`. Both version columns are kept as the record of the
+upgrade — only `v0.5.0` sits inside the supported range today:
 
 | Symbol / Interface | Expected Signature / Structure | v0.3.1 | v0.5.0 | Usage in tradingagents-ui |
 |--------------------|--------------------------------|--------|--------|---------------------------|

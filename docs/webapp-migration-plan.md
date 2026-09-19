@@ -5,8 +5,10 @@ file. Do not re-derive decisions that are already recorded here.
 
 ## 0. Context you must not break
 
-- The repo is a thin Python layer over the upstream `tradingagents` package (pinned
-  `v0.3.1`, git install). Upstream is installed in the venv; do not vendor or patch it.
+- The repo is a thin Python layer over the upstream `tradingagents` package (git
+  install). The pin was raised from `v0.3.1` to `v0.5.0` after the contract suite and the
+  app's own tests passed against it; the supported range lives in
+  `tradingagents_compat.py`. Upstream is installed in the venv; do not vendor or patch it.
 - `app.py` (~1.7k lines) is the current Streamlit UI. It stays working until Phase 5.
 - The existing 49 tests in `tests/` must stay green in every phase.
 - Tooling: run everything through the worktree venv.
@@ -247,8 +249,8 @@ New package `tradingagents_contract/` asserting these symbols exist with the exp
 - `cli.stats_handler.StatsCallbackHandler` — note `cli` is a top-level package that ships
   with upstream; a global `PYTHONPATH` shadows it (see §0)
 
-CI runs this suite twice: once against `v0.3.1` and once against the latest upstream tag, and
-reports which symbol changed. Output a `COMPATIBILITY.md` matrix.
+CI runs this suite twice: once against the pinned tag (`v0.5.0`) and once against the latest
+upstream tag, and reports which symbol changed. Output a `COMPATIBILITY.md` matrix.
 
 ## 10. Phases, ownership and acceptance
 

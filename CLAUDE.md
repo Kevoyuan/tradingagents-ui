@@ -99,7 +99,7 @@ The CLI does not install or update TradingAgents during startup. The deprecated 
 - Long Streamlit app is intentionally a single file: app.py is ~1.7k lines. Helper modules are only for things that need to be reused (config constants, CSS, panel renderers) or for things that are easier to test outside Streamlit.
 - HTML report generation runs an out-of-process Bun script (`tools/baoyu-markdown-to-html/scripts/main.ts`). `ensure_baoyu_dependencies` lazily installs its `node_modules` on first use. The script returns a JSON envelope with `htmlPath`; the HTML is read back into Python and embedded via `streamlit.components.v1.html`.
 - Provider model lists come from two sources, in priority order: `PROVIDER_MODEL_OPTIONS` (UI-defined overrides) then `MODEL_OPTIONS` (imported from `tradingagents.llm_clients.model_catalog`). The override exists because some TradingAgents provider setups don't ship the most current models.
-- Native providers and model metadata come from TradingAgents v0.3.1 where possible. Legacy `custom_openai` preferences migrate to the upstream `openai_compatible` runtime; UI-only Anthropic-compatible endpoints remain in `PROVIDER_RUNTIME`.
+- Native providers and model metadata come from TradingAgents v0.5.0 where possible. Legacy `custom_openai` preferences migrate to the upstream `openai_compatible` runtime; UI-only Anthropic-compatible endpoints remain in `PROVIDER_RUNTIME`.
 - Tests cover only pure helpers — anything that touches `st.session_state`, `streamlit.components.v1`, or threads is not unit-tested. The `tests/` directory is gitignored from the published repo (see `.gitignore`).
 
 ## Skill routing

@@ -15,6 +15,7 @@ from tradingagents_compat import (
     TRADINGAGENTS_MAX_VERSION,
     TRADINGAGENTS_REPO_URL,
     TRADINGAGENTS_TARGET_TAG,
+    supported_range,
     tradingagents_compatibility,
     version_tuple,
 )
@@ -212,7 +213,8 @@ def get_upstream_status(force_refresh: bool = False) -> dict[str, Any]:
                 "error": "",
                 "notice": (
                     f"Local TradingAgents checkout detected ({local_tag}). "
-                    f"This app will not change its branch. Required compatibility: >=0.3.1,<0.4."
+                    f"This app will not change its branch. "
+                    f"Required compatibility: {supported_range()}."
                 ),
             }
             _upstream_status_cache = res
