@@ -51,7 +51,6 @@ def test_graph_propagator_create_initial_state(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-contract-test")
 
     try:
-        from tradingagents.default_config import DEFAULT_CONFIG
         from tradingagents.graph.propagation import Propagator
         from tradingagents.graph.trading_graph import TradingAgentsGraph
     except (ImportError, ModuleNotFoundError) as exc:
@@ -66,6 +65,8 @@ def test_graph_propagator_create_initial_state(monkeypatch):
         )
 
     # Check instance propagator
+    from tradingagents.default_config import DEFAULT_CONFIG
+
     graph_inst = TradingAgentsGraph(config=DEFAULT_CONFIG)
     assert hasattr(graph_inst, "propagator"), "TradingAgentsGraph instance missing .propagator attribute"
     assert hasattr(graph_inst.propagator, "create_initial_state"), (
@@ -276,3 +277,95 @@ def test_cli_stats_handler_contract():
         pytest.fail(msg)
 
     assert inspect.isclass(StatsCallbackHandler), "StatsCallbackHandler is not a class"
+
+
+def test_stream_mode_is_values():
+    """The run monitor's agent attribution assumes the stream is full state.
+
+    Upstream runs with stream_mode="values", so every chunk is a complete
+    AgentState and there are no node-keyed chunks. Attribution therefore reads
+    state field transitions. If upstream switches to "updates" the chunks become
+    {node: delta} and every message goes out unattributed again: all rows render
+    as "System" and the roster and stage rail stay at zero. That failure shipped
+    three times before the assumption was written down here.
+    """
+    monkeypatch_env = {"OPENAI_API_KEY": "sk-contract-test"}
+    previous = {k: os.environ.get(k) for k in monkeypatch_env}
+    os.environ.update(monkeypatch_env)
+    try:
+        from tradingagents.graph.propagation import Propagator
+    except (ImportError, ModuleNotFoundError) as exc:
+        pytest.fail(f"Propagator missing or failed to import: {exc}")
+    finally:
+        for name, value in previous.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+    args = Propagator().get_graph_args()
+    assert args.get("stream_mode") == "values", (
+        "get_graph_args() no longer returns stream_mode='values' "
+        f"(got {args.get('stream_mode')!r}). Agent attribution reads state fields, "
+        "not node keys; revisit trade_ui/server/runner.py before bumping upstream."
+    )
+
+
+def test_agent_state_fields_used_for_attribution():
+    """Attribution keys on these AgentState fields; a rename breaks it silently."""
+    try:
+        from tradingagents.agents.utils.agent_states import AgentState
+    except (ImportError, ModuleNotFoundError) as exc:
+        pytest.fail(f"agent_states.AgentState missing or failed to import: {exc}")
+
+    annotations = set(getattr(AgentState, "__annotations__", {}))
+    required = {
+        "messages",
+        "market_report",
+        "sentiment_report",
+        "news_report",
+        "fundamentals_report",
+        "investment_debate_state",
+        "investment_plan",
+        "trader_investment_plan",
+        "risk_debate_state",
+        "final_trade_decision",
+    }
+    missing = sorted(required - annotations)
+    assert not missing, (
+        f"AgentState no longer declares {missing}. trade_ui/server/runner.py maps "
+        "these fields to agents and publishes report_section events from them."
+    )
+
+
+def test_debate_state_latest_speaker_values():
+    """Debate attribution follows latest_speaker, so its value set is a contract."""
+    import pathlib as _pathlib
+
+    try:
+        import tradingagents.agents as agents_pkg
+    except (ImportError, ModuleNotFoundError) as exc:
+        pytest.fail(f"tradingagents.agents missing or failed to import: {exc}")
+
+    root = _pathlib.Path(agents_pkg.__file__).parent
+    texts = [
+        p.read_text(encoding="utf-8", errors="replace")
+        for p in root.rglob("*.py")
+        if p.name
+        in {
+            "aggressive_debator.py",
+            "neutral_debator.py",
+            "conservative_debator.py",
+            "portfolio_manager.py",
+            "research_manager.py",
+        }
+    ]
+    assert texts, "none of the debate/manager source files were found to inspect"
+
+    joined = "\n".join(texts)
+    required = {"Aggressive", "Neutral", "Conservative", "Judge"}
+    missing = sorted(v for v in required if f'"latest_speaker": "{v}"' not in joined)
+    assert not missing, (
+        f"latest_speaker values {missing} no longer appear in the debate/manager "
+        "sources. runner.py's debate_speakers map depends on them."
+    )
