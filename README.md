@@ -1,6 +1,6 @@
 # TradingAgents UI
 
-A local web app for running [TradingAgents](https://github.com/TauricResearch/TradingAgents) analyses and reading the resulting reports. The UI is React served by a FastAPI backend; the analysis engine is the upstream `tradingagents` package, unmodified.
+A local web app for running [TradingAgents](https://github.com/TauricResearch/TradingAgents) analyses and reading the resulting reports. The interface is a React single-page app served by a FastAPI backend; the analysis engine is the upstream `tradingagents` package, unmodified.
 
 [中文说明](README_zh.md)
 
@@ -10,7 +10,7 @@ A local web app for running [TradingAgents](https://github.com/TauricResearch/Tr
 
 ## Quick Start
 
-Requirements: Python 3.10+, [uv](https://docs.astral.sh/uv/), and Node.js 18+ (for frontend build).
+Requirements: Python 3.10+, [uv](https://docs.astral.sh/uv/), and Node.js 18+ (to build the frontend).
 
 ```bash
 git clone https://github.com/Kevoyuan/tradingagents-ui.git
@@ -21,19 +21,28 @@ bash scripts/build-frontend.sh
 trade-ui
 ```
 
-### Launch Modes
+The app starts on <http://localhost:8501>.
 
-- **Default (FastAPI + React)**: Run `trade-ui` to start the new React SPA and FastAPI backend server.
+### Launch Options
+
+The installed command accepts a custom port and a LAN binding:
+
+```bash
+trade-ui --port 9000   # custom port
+trade-ui --lan         # bind 0.0.0.0 for phone/tablet access
+```
+
+See [LAN access](docs/lan-access.md) for details.
 
 ### Building the Frontend
 
-The web UI frontend is built with React, Vite, and TypeScript. Build static assets before running the default interface or packaging:
+The frontend is built with React, Vite, and TypeScript. Build the static assets before running the interface or packaging:
 
 ```bash
 bash scripts/build-frontend.sh
 ```
 
-Compiled assets are placed into `trade_ui/static/` and packaged directly into wheels for pip distribution without requiring Node at runtime.
+Compiled assets are written to `trade_ui/static/` and packaged into wheels, so pip installs do not need Node at runtime.
 
 ### macOS
 
@@ -50,19 +59,18 @@ Double-click `scripts\launch-local-webapp.bat`. The launcher creates the local e
 
 ## First Run
 
-1. Select an LLM provider and models.
-2. Enter the required provider API key.
-3. Enter a ticker such as `NVDA` or `BTC-USD`.
-4. Choose the analyst team and research depth.
-5. Click **Run Analysis**.
+1. Open **Settings** (the gear in the left rail) and choose the LLM provider and models.
+2. Enter the provider API key. Saved keys are written to `~/.tradingagents/.env`.
+3. Set the ticker (for example `NVDA` or `BTC-USD`), trade date, output language, analyst team, and research depth.
+4. Click **New Run** in the top right, confirm the ticker and date, then press **Start Run**.
 
-The live view shows agent progress, tool calls and report sections. Completed reports remain available under **Browse Reports**.
+The Monitor shows agent progress, streamed messages, tool calls, token burn, and report sections as they arrive. Completed reports remain available under **Reports**.
 
 ## Screenshots
 
-### Embedded HTML Report
+### Exported HTML Report
 
-![Embedded HTML report](images/trade-ui-embedded-html-report.png)
+![Exported HTML report](images/trade-ui-exported-html-report.png)
 
 ### Report Viewer
 
@@ -78,12 +86,14 @@ The live view shows agent progress, tool calls and report sections. Completed re
 
 ## Core Features
 
-- Live multi-agent analysis progress
+- Live multi-agent analysis progress with streamed messages and tool evidence
+- Price and indicator charts built from the data agents cite
 - Stock and crypto analysis paths
 - TradingAgents checkpoint/resume support
 - Native and custom LLM providers
-- Markdown and embedded HTML reports
+- Markdown report viewer with one-click themed HTML export
 - Local report history and model-specific report files
+- Token and cost accounting from a generated price table
 - Optional local API key persistence
 
 ## API Keys and Privacy
@@ -94,9 +104,7 @@ Local launchers set local mode. When you save preferences or run an analysis, AP
 ~/.tradingagents/.env
 ```
 
-The file is created with user-only permissions where supported. Keys are not written to this repository by the UI. They are passed only to the providers selected for the run.
-
-Keys live only on this machine, in `~/.tradingagents/.env` (mode 600) and are passed to the selected provider for the duration of a run.
+The file is created with user-only permissions (mode 600) where supported. Keys are never written to this repository by the UI; they live only on this machine and are passed only to the provider selected for the run.
 
 Reports are stored under:
 
