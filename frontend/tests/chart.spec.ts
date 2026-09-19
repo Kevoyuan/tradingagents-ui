@@ -194,7 +194,7 @@ test.describe('Data charts', () => {
     await expect(charted).not.toContainText('bars');
   });
 
-  test('charts a repeated dataset once and leaves the repeats as text', async ({ page }) => {
+  test('charts a repeated dataset once and collapses the repeats', async ({ page }) => {
     const runId = 'chartdupe1';
     // The graph re-emits a message as its state grows; the NET run carried 94
     // charted messages over 18 datasets.
@@ -204,10 +204,16 @@ test.describe('Data charts', () => {
 
     await expect(page.locator('[data-testid="agent-message-charted"]')).toHaveCount(1);
     await expect(page.locator('[data-testid="data-chart"]')).toHaveCount(1);
-    // Both messages are still in the record: only the chart is de-duplicated.
-    // The first charts and collapses its rows; the repeat is left as text.
+    // Both messages are still in the record. The first charts and collapses its
+    // rows; the repeat says so and collapses its rows too, rather than putting
+    // the full wall of numbers back on screen.
     await expect(page.locator('[data-testid="event-2"]')).toContainText('Charted');
-    await expect(page.locator('[data-testid="event-2"]')).toContainText('Raw data');
+    await expect(page.locator('[data-testid="event-3"]')).toContainText('Repeat');
+    await expect(page.locator('[data-testid="event-3"]')).not.toContainText('Date,Open,High,Low,Close');
+    await expect(page.locator('[data-testid="event-3"] [data-testid="data-chart"]')).toHaveCount(0);
+
+    // The repeated rows are still reachable.
+    await page.locator('[data-testid="event-3"] [data-testid="toggle-raw-data"]').click();
     await expect(page.locator('[data-testid="event-3"]')).toContainText('Date,Open,High,Low,Close');
   });
 

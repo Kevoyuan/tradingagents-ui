@@ -41,7 +41,9 @@ function countDataLines(text: string): number {
 }
 
 export const AgentMessageBody: React.FC<AgentMessageBodyProps> = ({ text, chartable = true }) => {
-  const chart = useMemo(() => (chartable ? parseChartData(text) : null), [text, chartable]);
+  // Parse regardless of `chartable`: a repeat still needs to be recognised as a
+  // dataset so its rows can be collapsed. Only the chart itself is skipped.
+  const chart = useMemo(() => parseChartData(text), [text]);
   const [showRaw, setShowRaw] = useState(false);
 
   const markdown = (
@@ -59,14 +61,32 @@ export const AgentMessageBody: React.FC<AgentMessageBodyProps> = ({ text, charta
   }
 
   return (
-    <div data-testid="agent-message-charted">
-      <div className="flex items-baseline gap-3 pb-2">
-        <span className="text-[11px] font-bold tracking-[0.14em] uppercase text-mut">
-          Charted
-        </span>
-        <span className="text-[12px] text-faint num">{parts.join(' · ')}</span>
-      </div>
-      <DataChart data={chart} />
+    <div data-testid={chartable ? 'agent-message-charted' : 'agent-message-repeated'}>
+      {chartable ? (
+        <>
+          <div className="flex items-baseline gap-3 pb-2">
+            <span className="text-[11px] font-bold tracking-[0.14em] uppercase text-mut">
+              Charted
+            </span>
+            <span className="text-[12px] text-faint num">{parts.join(' · ')}</span>
+          </div>
+          <DataChart data={chart} />
+        </>
+      ) : (
+        // The graph re-emits a message as its state grows, so the same dataset
+        // can arrive four or five times. Only the first is charted; leaving the
+        // repeats as raw prose put a 127-row wall back on screen, which is the
+        // problem this feature exists to remove.
+        <div
+          className="flex items-baseline gap-3 text-[12px] text-faint"
+          data-testid="agent-message-repeat"
+        >
+          <span className="text-[11px] font-bold tracking-[0.14em] uppercase text-mut">
+            Repeat
+          </span>
+          <span className="num">same data as the chart above · {parts.join(' · ')}</span>
+        </div>
+      )}
       <button
         type="button"
         onClick={() => setShowRaw((value) => !value)}
