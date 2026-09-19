@@ -45,11 +45,36 @@ export function useRunEvents(
   const lastSeqRef = useRef<number>(lastSeq);
   const seenSeqRef = useRef<Set<number>>(new Set());
 
-  // Initialize seen sequences from initial events
+  // Reset ALL state when the selected run changes. The useState initialisers
+  // above only run on mount, so switching from run A to run B used to leave A's
+  // events in state and, worse, leave the sequence cursor at A's highest seq.
+  // The SSE request for B then went out as ?after=<A's max>, so B's early
+  // events were never requested at all and the record showed the previous run's
+  // log under the new run's header.
+  //
+  // Must stay declared before the streaming effect below: both are keyed on
+  // runId and run in declaration order, so this reseeds the cursor first.
   useEffect(() => {
-    seenSeqRef.current = new Set(events.map((e) => e.seq));
-    const maxSeq = events.reduce((max, e) => Math.max(max, e.seq), 0);
-    lastSeqRef.current = Math.max(lastSeqRef.current, maxSeq);
+    let restored: RunEvent[] = [];
+    let restoredSeq = 0;
+    if (runId) {
+      try {
+        const saved = sessionStorage.getItem(STORAGE_KEY_EVENTS(runId));
+        if (saved) restored = JSON.parse(saved) as RunEvent[];
+      } catch {
+        restored = [];
+      }
+      try {
+        const savedSeq = sessionStorage.getItem(STORAGE_KEY_LAST_SEQ(runId));
+        if (savedSeq) restoredSeq = parseInt(savedSeq, 10) || 0;
+      } catch {
+        restoredSeq = 0;
+      }
+    }
+    const maxSeq = restored.reduce((max, e) => Math.max(max, e.seq), 0);
+    seenSeqRef.current = new Set(restored.map((e) => e.seq));
+    lastSeqRef.current = Math.max(restoredSeq, maxSeq);
+    setEvents(restored);
     setLastSeq(lastSeqRef.current);
   }, [runId]);
 
