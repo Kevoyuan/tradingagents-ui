@@ -78,13 +78,19 @@ export const IconRail: React.FC<IconRailProps> = ({ currentPath = '/', onNavigat
           }
         }}
         className={`w-9 h-9 grid place-items-center transition-colors ${
-          isSettings ? 'text-white' : 'text-[#7c786f] hover:text-white'
+          isSettings ? 'text-white' : 'text-[#9a958a] hover:text-white'
         }`}
         data-testid="nav-settings"
       >
-        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6">
-          <circle cx="10" cy="10" r="2.6" />
-          <path d="M10 2.6v2.2M10 15.2v2.2M17.4 10h-2.2M4.8 10H2.6" />
+        {/* Sliders, not a gear: a 20-tab gear outline turns to mud at 16px and
+            the previous four-spoke glyph was invisible at this size. Three
+            ruled tracks with a knob each stays crisp and still reads as
+            "settings". */}
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+          <path d="M3 6h4M11 6h6M3 10h7M14 10h3M3 14h2M9 14h8" />
+          <circle cx="9" cy="6" r="1.7" />
+          <circle cx="12.5" cy="10" r="1.7" />
+          <circle cx="7" cy="14" r="1.7" />
         </svg>
       </a>
     </nav>
