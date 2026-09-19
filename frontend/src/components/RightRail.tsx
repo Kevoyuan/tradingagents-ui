@@ -19,7 +19,9 @@ function formatTokens(count?: number): string {
 }
 
 function formatCost(costUsd?: number | null): string {
-  if (costUsd === undefined || costUsd === null) return '$0.000';
+  // An unknown price must not render as zero: '$0.000' reads as 'this run was
+  // free' when the truth is 'this model has no entry in the price table'.
+  if (costUsd === undefined || costUsd === null) return '—';
   return `$${costUsd.toFixed(3)}`;
 }
 

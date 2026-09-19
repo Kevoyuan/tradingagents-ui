@@ -8,6 +8,7 @@ import time
 import traceback
 from collections.abc import Callable
 
+from trade_ui.model_pricing import PRICING_AS_OF, estimate_cost
 from trade_ui.server.event_bus import EventBus
 from trade_ui.server.models import RunConfig, RunHeader, TeamName
 
@@ -655,18 +656,31 @@ class UpstreamRunner:
             self.event_bus.close()
 
 
+    def _cost_model(self) -> str:
+        """The model the deep-thinking calls dominate, so price on it."""
+        config = getattr(self.config, "deep_model", None) or getattr(self.config, "quick_model", None)
+        return str(config or "")
+
     def _publish_stats(self, stats_handler) -> None:  # noqa: ANN001 - upstream handler
         """Publish the live counters the run stats panel and burn chart read."""
         try:
             stats = stats_handler.get_stats() or {}
         except Exception:
             return
+        tokens_in = int(stats.get("tokens_in", 0) or 0)
+        tokens_out = int(stats.get("tokens_out", 0) or 0)
+        # Upstream's stats handler has no cost field, so the figure comes from
+        # the generated price table. A model with no entry yields None, which
+        # the UI renders as an em dash: an unknown price must not look like a
+        # price of zero. Refresh the table with the llm-pricing skill.
+        cost = estimate_cost(self._cost_model(), tokens_in, tokens_out)
         payload = {
             "llm_calls": int(stats.get("llm_calls", 0) or 0),
             "tool_calls": int(stats.get("tool_calls", 0) or 0),
-            "tokens_in": int(stats.get("tokens_in", 0) or 0),
-            "tokens_out": int(stats.get("tokens_out", 0) or 0),
-            "cost_usd": stats.get("cost_usd"),
+            "tokens_in": tokens_in,
+            "tokens_out": tokens_out,
+            "cost_usd": cost,
+            "pricing_as_of": PRICING_AS_OF,
         }
         self.event_bus.publish(kind="stats", payload=payload)
         self.header.stats = payload
