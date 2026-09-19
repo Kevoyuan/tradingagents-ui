@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Settings — Nav Rail Panel</title>
+<!--
+Direction 3 · refinement requested by the user after picking the drawer:
+  - "3, 可以一次性看全部配置"  → all five sections visible at once, no per-chapter nav
+  - "而且我想放左边"           → flip from right drawer to left
+  - "你不是有导航栏吗，怎么不放导航栏" → it belongs to the existing 56px nav rail,
+    so it is chrome, not a modal: no scrim, the run stays fully readable on the right
+
+form 推导五问（相对 3-drawer 的变化点）：
+1. 叙事角色 — 仍然是「不离开运行的配置」，但归属变了：它现在是导航的展开态，而不是一
+   个盖在页面上的临时层。所以去掉遮罩是必然的——遮罩会宣告「你离开了当前页」，而用户
+   要的恰恰是没离开。
+2. 观众距离 — 1m 桌面。面板 660px + 轨道 56px 固定，右侧留给运行的宽度是确定值，
+   Monitor 不必因为配置打开而重排到不可用。
+3. 视觉温度 — 从属、安静。它是导航的延展，所以只有一条右侧边界线，没有投影、没有圆角、
+   没有浮起感。浮起感属于临时层，展开态不该有。
+4. 容量估算 — 五组共 19 个控件。面板内改双列排布，五组全部进 1050px，不需要滚动。
+   这正是用户要的「一次性看全部配置」：与方向一相同的完整性，但保持监控在侧。
+5. 视觉母题 — **仪表抽屉**，但抽屉改挂在左侧轨道上。母题不变的部分是顶部的
+   "Next run" 摘要条：它把「即将启动的到底是什么配置」压成一行，与右侧正在跑的运行
+   形成对照——左边是将要发生的，右边是正在发生的。
+
+form comes from：配置与监控必须并置这一真实用法，加上「设置属于导航而非模态」这一归属
+判断，因此面板从轨道长出、不加遮罩、单屏容纳全部控件。
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#fff; --page:#f2f1ee; --rule:#dcdad4; --rule-2:#ebe9e4;
+    --ink:#0a0a0a; --ink-2:#3d3a35; --mut:#6e6a63; --faint:#9c978e;
+    --ok:#0b6b3a;
+    --grotesk:Archivo,"Helvetica Neue",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;height:100%}
+  body{background:var(--page);color:var(--ink);font-family:var(--grotesk);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow:hidden}
+  h1,h2,h3,p{margin:0}
+  .num{font-variant-numeric:tabular-nums}
+  .shell{display:grid;grid-template-columns:56px 660px minmax(0,1fr);height:100vh}
+
+  /* ── nav rail ───────────────────────────────────────────── */
+  .irail{background:var(--ink);display:flex;flex-direction:column;align-items:center;padding:16px 0;gap:4px;z-index:3}
+  .imark{width:24px;height:24px;display:flex;flex-direction:column;justify-content:center;gap:2.5px;margin-bottom:18px}
+  .imark i{display:block;height:2.5px;background:#fff}
+  .imark i:nth-child(1){width:100%}.imark i:nth-child(2){width:56%}.imark i:nth-child(3){width:80%}
+  .irail a{width:36px;height:36px;display:grid;place-items:center;color:#7c786f;text-decoration:none;position:relative}
+  .irail a[aria-current]{color:#fff}
+  .irail a[aria-current]::after{content:"";position:absolute;right:-16px;top:6px;bottom:6px;width:2px;background:#fff}
+
+  /* ── the settings panel, grown out of the rail ─────────── */
+  .panel{background:var(--paper);border-right:1px solid var(--ink);display:flex;flex-direction:column;min-height:0;z-index:2}
+  .p-h{flex:0 0 auto;height:62px;display:flex;align-items:center;gap:12px;padding:0 22px;border-bottom:1px solid var(--ink)}
+  .p-h h1{font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}
+  .p-h .saved{font-family:var(--mono);font-size:12px;color:var(--faint)}
+  .p-h .x{margin-left:auto;width:26px;height:26px;display:grid;place-items:center;border:1px solid var(--rule);background:none;cursor:pointer;color:var(--ink-2)}
+
+  .next{flex:0 0 auto;background:var(--page);border-bottom:1px solid var(--rule);padding:12px 22px}
+  .next .k{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+  .next .v{font-family:var(--mono);font-size:12.5px;margin-top:5px;line-height:1.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .next .v b{font-weight:500}
+  .next .v span{color:var(--faint);padding:0 6px}
+
+  .p-b{flex:1;min-height:0;overflow-y:auto;padding:4px 22px 14px}
+  .sec{padding-top:15px}
+  .sec-h{display:flex;align-items:baseline;gap:8px;padding-bottom:7px;border-bottom:1px solid var(--ink)}
+  .sec-h .no{font-family:var(--mono);font-size:12px;color:var(--faint)}
+  .sec-h h2{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+  .sec-h .tag{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+  .rows{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+  .rows .wide{grid-column:1 / -1}
+  .f{padding:9px 0 8px;border-bottom:1px solid var(--rule-2)}
+  .rows .f:nth-last-child(1),.rows .f:nth-last-child(2){border-bottom:0}
+  .f .lb{font-size:11.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:4px}
+  .ctl{display:flex;align-items:center;gap:9px;min-height:31px;border:1px solid var(--rule);padding:0 10px;font-size:13.5px}
+  .ctl .v{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ctl .mono{font-family:var(--mono);font-size:12.5px}
+  .ctl .chev{margin-left:auto;color:var(--faint)}
+  .ctl .st{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--ok)}
+  .ctl .st::before{content:"● ";font-size:8px}
+  .ctl.masked .v{font-family:var(--mono);letter-spacing:.16em;color:var(--ink-2)}
+  .ctl.ro{background:var(--page);color:var(--mut)}
+  .tgrow{display:flex;gap:5px;flex-wrap:wrap}
+  .tg{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--ink);background:var(--ink);color:#fff;font-size:12.5px;padding:5px 9px}
+  .tg i{width:7px;height:7px;background:#fff;display:block}
+  .tg.off{border-color:var(--rule);background:transparent;color:var(--mut)}
+  .tg.off i{background:transparent;border:1px solid currentColor}
+  .seg{display:flex;border:1px solid var(--rule)}
+  .seg span{flex:1;text-align:center;padding:6px 0;font-size:12.5px;color:var(--mut);border-right:1px solid var(--rule)}
+  .seg span:last-child{border-right:0}
+  .seg span[aria-pressed]{background:var(--ink);color:#fff;font-weight:600}
+  .sw{display:flex;align-items:center;gap:9px;min-height:31px;font-size:13.5px;color:var(--ink-2)}
+  .sw i{width:30px;height:16px;border:1px solid var(--rule);background:var(--page);position:relative;display:block;flex:0 0 auto}
+  .sw i::after{content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;background:var(--faint)}
+  .sw.on i{background:var(--ink);border-color:var(--ink)}
+  .sw.on i::after{left:auto;right:2px;background:#fff}
+
+  .p-f{flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:12px 22px;border-top:1px solid var(--ink)}
+  .dirty{font-family:var(--mono);font-size:11.5px;color:var(--mut)}
+  .dirty b{color:var(--ink)}
+  .btn{font-family:var(--grotesk);font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;padding:10px 15px;cursor:pointer;border:1px solid var(--ink)}
+  .btn.ghost{background:transparent;color:var(--ink);margin-left:auto}
+  .btn.primary{background:var(--ink);color:#fff}
+
+  /* ── Monitor, fully readable, no scrim ──────────────────── */
+  .monitor{background:var(--paper);min-height:0;overflow:hidden}
+  .mast{height:62px;display:flex;align-items:center;gap:24px;padding:0 32px;border-bottom:1px solid var(--ink)}
+  .wordmark{font-size:13px;font-weight:700;letter-spacing:.15em;text-transform:uppercase}
+  .nav{display:flex;gap:20px}
+  .nav a{font-size:12px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);text-decoration:none}
+  .nav a[aria-current]{color:var(--ink);font-weight:700}
+  .runid{margin-left:auto;text-align:right}
+  .runid .t{font-size:17px;font-weight:600}
+  .runid .s{font-size:11.5px;color:var(--mut);font-family:var(--mono)}
+
+  .vb{display:grid;grid-template-columns:auto 1px 1fr;padding:0 32px;border-bottom:1px solid var(--ink)}
+  .vb-l{padding:18px 32px 20px 0}
+  .vb-l .cap{font-size:11.5px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--mut);display:flex;align-items:center;gap:8px}
+  .vb-l .cap i{width:6px;height:6px;background:var(--ok);display:block}
+  .action{font-size:56px;font-weight:600;letter-spacing:-.045em;line-height:.92;margin-top:8px;color:var(--ok)}
+  .vr{background:var(--rule)}
+  .vb-m{padding:20px 32px;display:flex;align-items:center;gap:34px}
+  .fig .k{font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+  .fig .v{font-size:20px;font-weight:600;letter-spacing:-.025em;margin-top:3px}
+  .stages{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--rule);padding:0 32px}
+  .stg{display:flex;align-items:baseline;gap:8px;padding:11px 0 11px 14px;border-right:1px solid var(--rule-2)}
+  .stg:first-child{padding-left:0}.stg:last-child{border-right:0}
+  .stg .sq{width:9px;height:9px;border:1px solid var(--faint);align-self:center}
+  .stg .nm{font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+  .stg .ct{font-size:12.5px;color:var(--faint);margin-left:auto;padding-right:14px}
+  .stg.done .sq{background:var(--mut);border-color:var(--mut)}
+  .stg.now .sq{background:var(--ink);border-color:var(--ink)}
+  .stg.now .nm{color:var(--ink);font-weight:700}
+  .rec{padding:18px 32px}
+  .rec-h{font-size:11.5px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;padding-bottom:9px;border-bottom:1px solid var(--ink)}
+  .ev{display:grid;grid-template-columns:62px 1fr;gap:16px;padding:12px 0;border-bottom:1px solid var(--rule)}
+  .ev .t{font-size:12px;color:var(--faint)}
+  .ev .who{font-size:14.5px;font-weight:600}
+  .ev .bd{font-size:13.5px;color:var(--ink-2);margin-top:5px;line-height:1.65}
+  .ev .bd em{font-family:var(--mono);font-style:normal;font-size:12.5px;color:var(--mut)}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <nav class="irail">
+    <span class="imark"><i></i><i></i><i></i></span>
+    <a href="#" title="Monitor"><svg width="16" height="16" viewBox="0 0 20 20" fill="none"><rect x="2.5" y="3.5" width="15" height="10.5" stroke="currentColor" stroke-width="1.6"/><path d="M7 17h6M10 14v3" stroke="currentColor" stroke-width="1.6"/></svg></a>
+    <a href="#" title="Reports"><svg width="16" height="16" viewBox="0 0 20 20" fill="none"><path d="M5 2.6h6.4L15.5 6.7v10.7H5z" stroke="currentColor" stroke-width="1.6"/><path d="M7.4 10.4h5.6M7.4 13.2h4" stroke="currentColor" stroke-width="1.6"/></svg></a>
+    <a href="#" aria-current="page" title="Settings"><svg width="16" height="16" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="2.6" stroke="currentColor" stroke-width="1.6"/><path d="M10 2.6v2.2M10 15.2v2.2M17.4 10h-2.2M4.8 10H2.6" stroke="currentColor" stroke-width="1.6"/></svg></a>
+  </nav>
+
+  <aside class="panel">
+    <div class="p-h">
+      <h1>Settings</h1>
+      <span class="saved">saved 09-18 23:18</span>
+      <button class="x" title="Collapse">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+
+    <div class="next">
+      <div class="k">Next run</div>
+      <div class="v"><b>NBIS</b><span>·</span>2026-09-18<span>·</span>Chinese<span>·</span>Deep 5<span>·</span>DeepSeek<span>·</span>deepseek-v4-flash</div>
+    </div>
+
+    <div class="p-b">
+
+      <div class="sec">
+        <div class="sec-h"><span class="no">01</span><h2>Run defaults</h2></div>
+        <div class="rows">
+          <div class="f"><div class="lb">Ticker</div><div class="ctl"><span class="v mono">NBIS</span></div></div>
+          <div class="f"><div class="lb">Analysis date</div><div class="ctl"><span class="v mono num">2026-09-18</span></div></div>
+          <div class="f"><div class="lb">Output language</div><div class="ctl"><span class="v">Chinese</span><span class="chev">▾</span></div></div>
+          <div class="f"><div class="lb">Research depth</div><div class="ctl"><span class="v">Deep · 5</span><span class="chev">▾</span></div></div>
+          <div class="f wide">
+            <div class="lb">Analysts</div>
+            <div class="tgrow">
+              <span class="tg"><i></i>Market</span><span class="tg"><i></i>Social</span>
+              <span class="tg"><i></i>News</span><span class="tg"><i></i>Fundamentals</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h"><span class="no">02</span><h2>Provider &amp; models</h2><span class="tag">native</span></div>
+        <div class="rows">
+          <div class="f"><div class="lb">LLM provider</div><div class="ctl"><span class="v">TradingAgents · DeepSeek</span><span class="chev">▾</span></div></div>
+          <div class="f"><div class="lb">Endpoint</div><div class="ctl ro"><span class="v mono">api.deepseek.com</span></div></div>
+          <div class="f"><div class="lb">Quick-thinking model</div><div class="ctl"><span class="v mono">deepseek-v4-flash</span><span class="chev">▾</span></div></div>
+          <div class="f"><div class="lb">Deep-thinking model</div><div class="ctl"><span class="v mono">deepseek-v4-flash</span><span class="chev">▾</span></div></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h"><span class="no">03</span><h2>Credentials</h2><span class="tag">local only</span></div>
+        <div class="rows">
+          <div class="f wide"><div class="lb">DeepSeek API key</div><div class="ctl masked"><span class="v">••••••••••••••••••••</span><span class="st">set</span></div></div>
+          <div class="f"><div class="lb">Alpha Vantage</div><div class="ctl"><span class="v mono" style="color:var(--mut)">ALPHA_VANTAGE_API_KEY</span><span class="st">set</span></div></div>
+          <div class="f"><div class="lb">FRED</div><div class="ctl"><span class="v mono" style="color:var(--mut)">FRED_API_KEY</span><span class="st">set</span></div></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h"><span class="no">04</span><h2>Data sources</h2></div>
+        <div class="rows">
+          <div class="f"><div class="lb">Core stock data</div><div class="ctl"><span class="v mono">yf, av</span><span class="chev">▾</span></div></div>
+          <div class="f"><div class="lb">Fundamentals</div><div class="ctl"><span class="v mono">yf, av</span><span class="chev">▾</span></div></div>
+          <div class="f"><div class="lb">News</div><div class="ctl"><span class="v mono">yf, av</span><span class="chev">▾</span></div></div>
+          <div class="f"><div class="lb">Macro</div><div class="ctl ro"><span class="v mono">fred</span></div></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h"><span class="no">05</span><h2>Advanced</h2><span class="tag">upstream default</span></div>
+        <div class="rows">
+          <div class="f"><div class="lb">Temperature</div><div class="ctl ro"><span class="v" style="color:var(--faint)">Upstream default</span></div></div>
+          <div class="f"><div class="lb">LLM max retries</div><div class="ctl ro"><span class="v" style="color:var(--faint)">Upstream default</span></div></div>
+          <div class="f wide">
+            <div class="lb">Checkpoint</div>
+            <div class="sw"><i></i>关闭 · 中断的运行不可续跑</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="p-f">
+      <span class="dirty"><b>2</b> unsaved</span>
+      <button class="btn ghost">Discard</button>
+      <button class="btn primary">Save</button>
+    </div>
+  </aside>
+
+  <div class="monitor">
+    <header class="mast">
+      <span class="wordmark">TradingAgents</span>
+      <nav class="nav"><a href="#" aria-current="page">Monitor</a><a href="#">Reports</a></nav>
+      <div class="runid"><div class="t">NBIS</div><div class="s">2026-09-18 · RUN 4A21C8</div></div>
+    </header>
+
+    <section class="vb">
+      <div class="vb-l">
+        <div class="cap"><i></i>Portfolio manager decision · 05 of 07</div>
+        <div class="action">BUY</div>
+      </div>
+      <div class="vr"></div>
+      <div class="vb-m">
+        <div class="fig"><div class="k">Entry price</div><div class="v num">223.54</div></div>
+        <div class="fig"><div class="k">Stop loss</div><div class="v num">194.38</div></div>
+        <div class="fig"><div class="k">Position sizing</div><div class="v num">2–3%</div></div>
+        <div class="fig"><div class="k">Elapsed</div><div class="v num">41:12</div></div>
+      </div>
+    </section>
+
+    <div class="stages">
+      <span class="stg done"><span class="sq"></span><span class="nm">Analysts</span><span class="ct num">4/4</span></span>
+      <span class="stg done"><span class="sq"></span><span class="nm">Research</span><span class="ct num">3/3</span></span>
+      <span class="stg done"><span class="sq"></span><span class="nm">Trading</span><span class="ct num">1/1</span></span>
+      <span class="stg done"><span class="sq"></span><span class="nm">Risk</span><span class="ct num">3/3</span></span>
+      <span class="stg now"><span class="sq"></span><span class="nm">Portfolio</span><span class="ct num">1/1</span></span>
+    </div>
+
+    <div class="rec">
+      <div class="rec-h">The record</div>
+      <div class="ev">
+        <span class="t num">00:41:12</span>
+        <div>
+          <div class="who">Portfolio Manager</div>
+          <div class="bd">评级定为 Underweight 而非 Sell：分子是真的，但分母恶化得更快，现价没有安全边际。<em> · 5,120 tok · 18.4s</em></div>
+        </div>
+      </div>
+      <div class="ev">
+        <span class="t num">00:38:02</span>
+        <div>
+          <div class="who">Trader</div>
+          <div class="bd">分批减仓，将现有敞口削减 1/3 至 1/2；反弹至 235–240 分批减持。<em> · 3,905 tok · 9.4s</em></div>
+        </div>
+      </div>
+      <div class="ev">
+        <span class="t num">00:35:40</span>
+        <div>
+          <div class="who">Conservative Analyst</div>
+          <div class="bd">任何看空表达只用有限风险看跌价差，权利金风险 0.25%–0.5%，禁用裸空。<em> · 4,410 tok · 14.1s</em></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
