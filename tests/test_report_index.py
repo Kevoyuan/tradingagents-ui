@@ -10,6 +10,7 @@ from trade_ui.report_index import (
     AgentBlock,
     ReportSection,
     extract_verdict,
+    list_reports,
     load_report_sections,
     normalize_headings,
 )
@@ -370,3 +371,32 @@ def test_report_section_model_aliases_and_properties() -> None:
     sec2 = ReportSection(title="Analyst Team", slug="analysts", agent_blocks=[block])
     assert sec2.blocks == [block]
     assert sec2.agent_blocks == [block]
+
+
+def _write_minimal_report(root: Path, ticker: str, trade_date: str) -> None:
+    rep = root / ticker / trade_date / "reports"
+    rep.mkdir(parents=True, exist_ok=True)
+    (rep / "5_portfolio").mkdir(exist_ok=True)
+    (rep / "5_portfolio" / "decision.md").write_text("**Rating**: Hold\n", encoding="utf-8")
+
+
+def test_list_reports_orders_by_date_then_ticker_ascending(tmp_path: Path) -> None:
+    """Newest date first, and A-Z within a date.
+
+    Regression: `sort(key=(date, ticker), reverse=True)` reversed the ticker too,
+    so two tickers analysed on the same day came back Z-A. A run that had just
+    finished appeared below an unrelated one on the same date and read as
+    missing — which is exactly how it was reported.
+    """
+    for ticker in ("SNDK", "NET", "MDB"):
+        _write_minimal_report(tmp_path, ticker, "2026-09-19")
+    _write_minimal_report(tmp_path, "AAA", "2026-09-18")
+
+    order = [(r.ticker, r.trade_date) for r in list_reports(logs_dir=tmp_path)]
+
+    assert order == [
+        ("MDB", "2026-09-19"),
+        ("NET", "2026-09-19"),
+        ("SNDK", "2026-09-19"),
+        ("AAA", "2026-09-18"),
+    ]

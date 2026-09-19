@@ -3,9 +3,18 @@ import { ReportSummary } from '../types';
 
 interface ReportsIndexScreenProps {
   onNavigate: (path: string) => void;
+  /**
+   * Changes when the selected run reaches a terminal state.
+   *
+   * The index was fetched once on mount, so a run started from the Settings
+   * drawer (a modal over this screen) finished while the user sat on a list
+   * that could not contain it, and the new report looked missing until they
+   * navigated away and back.
+   */
+  refreshKey?: string;
 }
 
-export const ReportsIndexScreen: React.FC<ReportsIndexScreenProps> = ({ onNavigate }) => {
+export const ReportsIndexScreen: React.FC<ReportsIndexScreenProps> = ({ onNavigate, refreshKey = '' }) => {
   const [reports, setReports] = useState<ReportSummary[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +38,7 @@ export const ReportsIndexScreen: React.FC<ReportsIndexScreenProps> = ({ onNaviga
         setError(err.message || String(err));
         setLoading(false);
       });
-  }, []);
+  }, [refreshKey]);
 
   return (
     <div className="min-h-screen bg-paper flex flex-col font-grotesk" data-testid="reports-index-screen">

@@ -300,7 +300,9 @@ export const App: React.FC = () => {
         </div>
       ) : isReportsIndex ? (
         <div className="bg-paper min-h-screen flex flex-col">
-          <ReportsIndexScreen onNavigate={navigate} />
+          {/* Refetch when the run the user is watching finishes, so a report
+              written by that run appears without navigating away and back. */}
+          <ReportsIndexScreen onNavigate={navigate} refreshKey={`${runId ?? ''}:${header?.status ?? ''}`} />
         </div>
       ) : (
         <div className="bg-paper min-h-screen flex flex-col">

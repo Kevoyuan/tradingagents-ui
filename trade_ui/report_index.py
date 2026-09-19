@@ -365,5 +365,11 @@ def list_reports(logs_dir: Path | str | None = None) -> list[ReportSummary]:
                 )
             )
 
-    reports.sort(key=lambda r: (r.trade_date, r.ticker), reverse=True)
+    # Newest date first, ticker A-Z within a date. Sorting the (date, ticker)
+    # tuple with reverse=True also reversed the ticker, so two tickers run on
+    # the same day came back Z-A: the newest run sat under an older-looking
+    # neighbour and read as missing. Two stable passes express what the
+    # docstring promises.
+    reports.sort(key=lambda r: r.ticker)
+    reports.sort(key=lambda r: r.trade_date, reverse=True)
     return reports
