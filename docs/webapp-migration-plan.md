@@ -142,6 +142,18 @@ Files may be missing (older runs, partially complete runs). Missing files are sk
 errors. The legacy `## I.`…`## V.` headings exist only in the merged file; the per-section
 files do not carry them, so the reader supplies the section titles.
 
+**Who writes them.** Upstream never persists this tree on its own: `write_report_tree` has
+exactly one caller inside the package (`TradingAgentsGraph.save_reports`), and nothing calls
+that. The retired Streamlit app was the only writer, so when it was archived nothing replaced
+it — the runner published `report_section` events, the Monitor's counter advanced, and no
+`logs/<TICKER>/<DATE>/reports/` appeared. `UpstreamRunner._persist_reports` now writes the
+tree on a completed (never cancelled) run, through `reporting_adapter.save_ui_reports`.
+
+Note when reconstructing a report from a `full_states_log_<date>.json` on disk: that file is
+a *serialized view*, not the live state. It renames the trader key to
+`trader_investment_decision` while the writer reads `trader_investment_plan`, so a
+hand-backfill must map it back or section III comes out empty.
+
 ### Heading normalisation (required, or the outline is useless)
 
 Agents' own markdown starts at H1 and uses H2/H3 internally. Measured on the real NBIS

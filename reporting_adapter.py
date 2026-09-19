@@ -2,8 +2,22 @@
 
 from __future__ import annotations
 
+import re
 import shutil
+from collections.abc import Callable
 from pathlib import Path
+
+
+def sanitize_model_filename(model: str) -> str:
+    """Render a model id as one safe filename component.
+
+    The retired Streamlit app passed its own helper in here; it lived in `app.py`
+    and left with it, so the default now ships with the function that needs it.
+    Model ids like `deepseek-v4-flash` pass through unchanged, which keeps the
+    existing `complete_report__deep-<model>.md` names stable.
+    """
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", str(model)).strip("-")
+    return cleaned or "model"
 
 
 def save_ui_reports(
@@ -12,7 +26,7 @@ def save_ui_reports(
     trade_date: str,
     results_root: str | Path,
     deep_model: str,
-    safe_filename_part,
+    safe_filename_part: Callable[[str], str] = sanitize_model_filename,
 ) -> tuple[Path, str]:
     """Write the upstream report tree plus the UI's model-specific copy."""
     from tradingagents.dataflows.utils import safe_ticker_component

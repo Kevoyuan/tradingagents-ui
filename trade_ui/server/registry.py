@@ -211,6 +211,7 @@ class RunRegistry:
                     event_bus=event_bus,
                     cancel_token=cancel_token,
                     on_header_update=on_header_update,
+                    logs_dir=self.settings.logs_dir,
                 )
 
             thread = threading.Thread(target=runner.run, name=f"run-{run_id}", daemon=True)

@@ -3,16 +3,30 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 import traceback
 from collections.abc import Callable
+from pathlib import Path
 
 from trade_ui.model_pricing import PRICING_AS_OF, estimate_cost
 from trade_ui.server.event_bus import EventBus
 from trade_ui.server.models import RunConfig, RunHeader, TeamName
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_logs_dir() -> Path:
+    """Locate the report archive the Reports screen reads.
+
+    Mirrors ServerSettings so a runner built directly (tests, scripts) still
+    writes into the same tree it will later be read back from.
+    """
+    env_logs = os.environ.get("TRADINGAGENTS_LOGS_DIR")
+    if env_logs:
+        return Path(env_logs).expanduser().resolve()
+    return (Path.home() / ".tradingagents" / "logs").resolve()
 
 
 class CancellationToken:
@@ -380,12 +394,14 @@ class UpstreamRunner:
         event_bus: EventBus,
         cancel_token: CancellationToken,
         on_header_update: Callable[[RunHeader], None],
+        logs_dir: str | Path | None = None,
     ) -> None:
         self.header = header
         self.config = config
         self.event_bus = event_bus
         self.cancel_token = cancel_token
         self.on_header_update = on_header_update
+        self.logs_dir = Path(logs_dir).expanduser().resolve() if logs_dir is not None else resolve_logs_dir()
 
     def run(self) -> None:
         ticker = self.header.ticker
@@ -446,6 +462,10 @@ class UpstreamRunner:
 
                 asset_type = detect_asset_type(ticker)
                 cancelled = False
+                # Upstream runs with stream_mode="values", so the last chunk is
+                # the complete final state. It is the only thing that can be
+                # handed to the report writer once the stream ends.
+                final_state: dict = {}
 
                 # Upstream runs with stream_mode="values"
                 # (tradingagents/graph/propagation.py), so every chunk is the full
@@ -539,6 +559,7 @@ class UpstreamRunner:
                     if self.cancel_token.is_cancelled:
                         cancelled = True
                         break
+                    final_state = chunk
 
                     # Who is working right now, per the state we were just handed.
                     for field, mapping in report_agents.items():
@@ -626,6 +647,11 @@ class UpstreamRunner:
                     )
                     self.header.status = "cancelled"
                 else:
+                    # Persist before announcing completion: the Reports screen
+                    # refetches its index the moment the run leaves "running",
+                    # so a report written after that would need a manual reload
+                    # to appear.
+                    self._persist_reports(final_state, resolved.deep_model)
                     self.event_bus.publish(
                         kind="run_state",
                         payload={
@@ -655,6 +681,40 @@ class UpstreamRunner:
         finally:
             self.event_bus.close()
 
+    def _persist_reports(self, final_state: dict, deep_model: str) -> None:
+        """Write the per-section report tree that the Reports screen reads.
+
+        Upstream never persists this tree on its own: `write_report_tree` has no
+        caller anywhere inside the package, and the retired Streamlit app was
+        the only thing that ever called it. Without this the run finished, the
+        Monitor showed its report counters, and no
+        `logs/<TICKER>/<DATE>/reports/` appeared — so new analyses were visible
+        in the Monitor and invisible in Reports.
+        """
+        if not final_state:
+            return
+        try:
+            from reporting_adapter import save_ui_reports
+
+            report_dir, _ = save_ui_reports(
+                final_state,
+                self.header.ticker,
+                self.header.trade_date,
+                self.logs_dir,
+                deep_model,
+            )
+            logger.info("Run %s wrote reports to %s", self.header.run_id, report_dir)
+        except Exception as err:
+            # A failed write must not turn a finished analysis into a failed run;
+            # the analysis itself succeeded and its record is already on disk.
+            logger.exception("Run %s failed to persist reports: %s", self.header.run_id, err)
+            self.event_bus.publish(
+                kind="error",
+                payload={
+                    "message": f"Reports could not be written to disk: {err}",
+                    "traceback": traceback.format_exc(),
+                },
+            )
 
     def _cost_model(self) -> str:
         """The model the deep-thinking calls dominate, so price on it."""
