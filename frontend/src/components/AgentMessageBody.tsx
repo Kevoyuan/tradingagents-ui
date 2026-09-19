@@ -21,15 +21,27 @@ import { DataChart } from './DataChart';
 
 interface AgentMessageBodyProps {
   text: string;
+  /**
+   * False for a repeat of a dataset already charted earlier in the record. The
+   * text still renders; only the chart is suppressed.
+   */
+  chartable?: boolean;
 }
 
-/** Lines that are raw data rather than commentary, used to size the collapsed view. */
+/**
+ * Lines that are raw data rather than commentary, used to size the collapsed
+ * view. Covers both shapes: CSV rows (`2026-08-07,300.27,...`) and markdown
+ * table rows (`| 2026-08-07 | 300.27 |`).
+ */
 function countDataLines(text: string): number {
-  return text.split(/\r?\n/).filter((line) => /\d{4}-\d{2}-\d{2}\s*[,:]/.test(line)).length;
+  return text
+    .split(/\r?\n/)
+    .filter((line) => /\d{4}-\d{2}-\d{2}\s*[,:]/.test(line) || /^\s*\|[^|]*\d{4}-\d{2}-\d{2}/.test(line))
+    .length;
 }
 
-export const AgentMessageBody: React.FC<AgentMessageBodyProps> = ({ text }) => {
-  const chart = useMemo(() => parseChartData(text), [text]);
+export const AgentMessageBody: React.FC<AgentMessageBodyProps> = ({ text, chartable = true }) => {
+  const chart = useMemo(() => (chartable ? parseChartData(text) : null), [text, chartable]);
   const [showRaw, setShowRaw] = useState(false);
 
   const markdown = (

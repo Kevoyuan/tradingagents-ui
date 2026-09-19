@@ -71,6 +71,20 @@ export const TheRecord: React.FC<TheRecordProps> = ({ events }) => {
     });
   }, [events, toolCallIds]);
 
+  // The graph re-emits messages as its state grows, so one dataset can appear
+  // several times (the NET run: 18 distinct datasets across 94 messages). Chart
+  // each dataset once, on its first appearance, and leave the repeats as text —
+  // the record stays complete without becoming a wall of identical charts.
+  const chartOwners = useMemo(() => {
+    const owners = new Map<string, number>();
+    for (const e of displayEvents) {
+      if (e.kind !== 'agent_message') continue;
+      const text = e.payload?.text || '';
+      if (text && !owners.has(text)) owners.set(text, e.seq);
+    }
+    return owners;
+  }, [displayEvents]);
+
   return (
     <div className="py-7.5 pr-12 pb-20 pl-10 border-r border-rule" data-testid="the-record">
       {/* Section Header */}
@@ -126,7 +140,10 @@ export const TheRecord: React.FC<TheRecordProps> = ({ events }) => {
                     </div>
                   </div>
                   <div className="mt-2.5 pl-[86px] text-[15px] leading-[1.74] text-ink-2 prose prose-sm max-w-none">
-                    <AgentMessageBody text={evt.payload?.text || ''} />
+                    <AgentMessageBody
+                      text={evt.payload?.text || ''}
+                      chartable={chartOwners.get(evt.payload?.text || '') === evt.seq}
+                    />
                   </div>
                 </article>
               );
