@@ -45,10 +45,31 @@ export const ToolEvidence: React.FC<ToolEvidenceProps> = ({ evidence }) => {
     ? fullContent || evidence.result || 'No output'
     : evidence.result || 'No output';
 
+  // One line per tool call by default. Raw tool output is often hundreds of
+  // rows of CSV, and rendering it inline for every call buried the reasoning
+  // the user actually reads. Collapsed state shows what the call was and how
+  // much came back; the detail is one click away.
+  const rawResult = evidence.result || '';
+  const resultLines = rawResult ? rawResult.split('\n').filter((l) => l.trim()).length : 0;
+  const firstLine = rawResult.split('\n').find((l) => l.trim())?.trim() ?? '';
+  const summary =
+    resultLines > 3
+      ? `${resultLines} rows`
+      : firstLine.length > 78
+        ? `${firstLine.slice(0, 78)}…`
+        : firstLine || 'no output';
+
   return (
     <div className="my-3 ml-16 border-l border-rule pl-4.5 bg-paper/50">
-      {/* Evidence header */}
-      <div className="flex items-baseline gap-3 mb-2">
+      {/* Evidence header - also the disclosure control */}
+      <button
+        type="button"
+        onClick={handleExpandToggle}
+        aria-expanded={expanded}
+        className="flex w-full items-baseline gap-3 text-left bg-transparent border-0 p-0 cursor-pointer group"
+        data-testid={`tool-evidence-${evidence.tool}`}
+      >
+        <span className="text-[11px] text-faint w-3 shrink-0">{expanded ? '▾' : '▸'}</span>
         <span className="font-mono text-[13px] font-medium text-ink">
           {evidence.tool}
         </span>
@@ -61,9 +82,16 @@ export const ToolEvidence: React.FC<ToolEvidenceProps> = ({ evidence }) => {
             {evidence.ok ? 'ok' : 'err'}
           </span>
         )}
+        {!expanded && (
+          <span className="text-xs text-mut truncate min-w-0" data-testid="tool-evidence-summary">
+            {summary}
+          </span>
+        )}
         <span className="ml-auto text-xs text-faint num">{durationStr}</span>
-      </div>
+      </button>
 
+      {expanded && (
+      <div className="mt-2">
       {/* IO description list */}
       <dl className="grid grid-cols-[50px_1fr] gap-x-4 gap-y-1.5 text-xs my-0">
         <dt className="text-xs font-bold tracking-[0.12em] uppercase text-faint pt-0.5">
@@ -83,19 +111,12 @@ export const ToolEvidence: React.FC<ToolEvidenceProps> = ({ evidence }) => {
         </dd>
       </dl>
 
-      {(evidence.truncated || evidence.full_ref) && (
-        <button
-          type="button"
-          onClick={handleExpandToggle}
-          disabled={isLoadingFull}
-          className="mt-2.5 text-xs font-bold tracking-[0.13em] uppercase text-ink cursor-pointer border-b border-ink inline-block pb-0.5 bg-transparent p-0 hover:text-mut hover:border-mut transition-colors"
-        >
-          {isLoadingFull
-            ? 'Loading...'
-            : expanded
-              ? 'Collapse full result'
-              : 'Expand full result'}
-        </button>
+      {evidence.truncated && (
+        <p className="mt-2 text-xs text-faint">
+          {isLoadingFull ? 'Loading full result…' : 'Showing the preview; the full result loads on expand.'}
+        </p>
+      )}
+      </div>
       )}
     </div>
   );
