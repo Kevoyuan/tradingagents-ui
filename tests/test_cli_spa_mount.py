@@ -14,6 +14,9 @@ def _make_static(tmp_path: Path) -> Path:
     static = tmp_path / "static"
     static.mkdir()
     (static / "index.html").write_text('<div id="root"></div>', encoding="utf-8")
+    assets = static / "assets"
+    assets.mkdir()
+    (assets / "index-abc123.js").write_text("console.log('bundle')", encoding="utf-8")
     return static
 
 
@@ -51,3 +54,27 @@ def test_spa_mount_serves_index_and_does_not_shadow_api(tmp_path: Path) -> None:
     # /api/providers is not implemented, but it must 404 as an API route rather
     # than be swallowed by the SPA fallback.
     assert client.get("/api/providers").status_code == 404
+
+
+def test_spa_shell_revalidates_but_hashed_assets_stay_cacheable(tmp_path: Path) -> None:
+    """The shell must never be served from heuristic cache.
+
+    The launcher reuses an already-open app window, so a window that keeps a
+    cached shell keeps loading the previous build's JS. That produced
+    "the app is running old code" symptoms twice: once as counters stuck at
+    zero, once as a Settings button that appeared to do nothing. The shell is
+    the only file that names the bundle, so it carries `no-cache`; the hashed
+    asset names change with their contents and stay cacheable.
+    """
+    client = TestClient(create_ui_app(static_dir=_make_static(tmp_path)))
+
+    root = client.get("/")
+    assert root.headers.get("cache-control") == "no-cache"
+
+    # A deep route returns the same shell, so it carries the same directive.
+    deep = client.get("/reports/NBIS/2026-09-18")
+    assert deep.headers.get("cache-control") == "no-cache"
+
+    asset = client.get("/assets/index-abc123.js")
+    assert asset.status_code == 200
+    assert asset.headers.get("cache-control") is None

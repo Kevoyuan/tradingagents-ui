@@ -65,12 +65,34 @@ def create_ui_app(static_dir: Path | None = None) -> FastAPI:
             try:
                 response = await super().get_response(path, scope)
                 if response.status_code == 404 and not path.startswith("assets/"):
-                    return await super().get_response("index.html", scope)
-                return response
+                    return await self._serve_shell(scope)
+                return self._always_revalidate_html(response)
             except HTTPException as exc:
                 if exc.status_code == 404 and not path.startswith("assets/"):
-                    return await super().get_response("index.html", scope)
+                    return await self._serve_shell(scope)
                 raise exc
+
+        async def _serve_shell(self, scope):
+            """Serve index.html for a client-side route."""
+            return self._always_revalidate_html(await super().get_response("index.html", scope))
+
+        @staticmethod
+        def _always_revalidate_html(response):
+            """Make the SPA shell revalidate on every load.
+
+            The shell is the only thing that names the hashed bundle, and the
+            launcher deliberately reuses an already-open app window instead of
+            opening a new one. With no Cache-Control the browser cached the shell
+            heuristically, so a plainly reloaded window could keep loading the
+            previous build's JS and show stale behaviour that looks exactly like
+            a bug. `no-cache` still allows a 304, so this costs a conditional
+            request, not a re-download. The hashed assets keep their normal
+            caching: their names change whenever their contents do.
+            """
+            content_type = response.headers.get("content-type", "")
+            if content_type.startswith("text/html"):
+                response.headers["Cache-Control"] = "no-cache"
+            return response
 
     app = create_app()
 
