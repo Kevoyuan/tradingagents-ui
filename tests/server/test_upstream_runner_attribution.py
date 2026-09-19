@@ -177,3 +177,16 @@ def test_upstream_run_publishes_stats(monkeypatch, tmp_path: Path) -> None:
     assert stats[-1]["payload"]["tool_calls"] == 2
     assert stats[-1]["payload"]["tokens_in"] == 1500
     assert stats[-1]["payload"]["tokens_out"] == 800
+
+
+def test_upstream_run_publishes_report_sections(monkeypatch, tmp_path: Path) -> None:
+    """The reducer counts report_section events for the Reports n/7 figure. The
+    upstream runner published none, so it read 0/7 for the whole run."""
+    bus = _run_upstream(monkeypatch, tmp_path)
+    sections = [e for e in bus.events if e["kind"] == "report_section"]
+    assert sections, "upstream run must publish report_section events"
+    assert all(e["payload"].get("complete") is True for e in sections)
+    keys = {e["payload"]["key"] for e in sections}
+    assert "market_report" in keys
+    assert "final_trade_decision" in keys
+    assert all(e["agent"] for e in sections)

@@ -50,7 +50,12 @@ export const App: React.FC = () => {
   const { events } = useRunEvents(runId, isRunActive);
 
   const [isLauncherOpen, setIsLauncherOpen] = useState<boolean>(false);
-  const [elapsedSec, setElapsedSec] = useState<number>(0);
+  // Elapsed time is derived from the run's own timestamps, not counted in the
+  // browser. The old local counter measured how long the page had been open:
+  // opening an in-progress run showed 00:00, refreshing reset it, and a
+  // finished run kept ticking up. nowTick only drives a re-render while the
+  // run is live.
+  const [nowTick, setNowTick] = useState<number>(() => Date.now());
 
   // Dynamic state derived from events
   const [agentsState, setAgentsState] = useState<
@@ -79,21 +84,23 @@ export const App: React.FC = () => {
     setReportsCount(0);
     setActiveAgentSlug(null);
     setTokenHistory([]);
-    setElapsedSec(0);
   }, [runId]);
 
-  // Elapsed time counter
+  // Tick only while the run is live; once it ends the elapsed value is frozen.
   useEffect(() => {
-    if (header?.status !== 'running') {
-      return;
-    }
-
-    const interval = setInterval(() => {
-      setElapsedSec((prev) => prev + 1);
-    }, 1000);
-
+    if (!header?.started_at || header.completed_at) return;
+    if (header.status !== 'running' && header.status !== 'pending') return;
+    const interval = setInterval(() => setNowTick(Date.now()), 1000);
     return () => clearInterval(interval);
-  }, [header?.status]);
+  }, [header?.started_at, header?.completed_at, header?.status]);
+
+  const elapsedSec = useMemo(() => {
+    const startedAt = header?.started_at ? Date.parse(header.started_at) : NaN;
+    if (!Number.isFinite(startedAt)) return 0;
+    const endedAt = header?.completed_at ? Date.parse(header.completed_at) : nowTick;
+    if (!Number.isFinite(endedAt)) return 0;
+    return Math.max(0, Math.floor((endedAt - startedAt) / 1000));
+  }, [header?.started_at, header?.completed_at, nowTick]);
 
   // Process events to update agent roster, verdict, stats, and stages
   useEffect(() => {

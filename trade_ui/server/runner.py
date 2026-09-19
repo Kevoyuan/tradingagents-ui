@@ -474,6 +474,15 @@ class UpstreamRunner:
                     "Conservative": ("conservative_analyst", "risk"),
                     "Judge": ("portfolio_manager", "portfolio"),
                 }
+                REPORT_TITLES = (
+                    ("market_report", "Market Analyst"),
+                    ("sentiment_report", "Sentiment Analyst"),
+                    ("news_report", "News Analyst"),
+                    ("fundamentals_report", "Fundamentals Analyst"),
+                    ("investment_plan", "Research Manager"),
+                    ("trader_investment_plan", "Trader"),
+                    ("final_trade_decision", "Portfolio Manager"),
+                )
                 finished: set[str] = set()
                 last_slug: str | None = None
                 last_team: TeamName | None = None
@@ -536,6 +545,21 @@ class UpstreamRunner:
                             seen_reports.add(field)
                             start(*mapping)
                             finish(mapping[0])
+                            # The reducer counts report_section events to drive
+                            # the Reports n/7 figure. The upstream runner never
+                            # published any, so that counter sat at zero for the
+                            # whole run even after every report was written.
+                            self.event_bus.publish(
+                                kind="report_section",
+                                payload={
+                                    "key": field,
+                                    "title": dict(REPORT_TITLES).get(field, field),
+                                    "markdown": str(chunk.get(field) or ""),
+                                    "complete": True,
+                                },
+                                agent=mapping[0],
+                                team=mapping[1],
+                            )
 
                     for debate_field in ("investment_debate_state", "risk_debate_state"):
                         debate = chunk.get(debate_field) or {}

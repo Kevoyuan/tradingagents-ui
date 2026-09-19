@@ -69,7 +69,9 @@ export const VerdictBand: React.FC<VerdictBandProps> = ({
       ? 'Analysis In Progress'
       : runStatus === 'cancelled'
         ? 'Run Cancelled by User'
-        : 'Awaiting Run Initiation';
+        : runStatus === 'failed'
+          ? 'Run Failed'
+          : 'Awaiting Run Initiation';
 
   const entryPrice = verdict?.entry_price || '—';
   const stopLoss = verdict?.stop_loss || '—';
@@ -85,7 +87,9 @@ export const VerdictBand: React.FC<VerdictBandProps> = ({
       ? 'All agents finished · Report complete'
       : runStatus === 'cancelled'
         ? 'Run stopped'
-        : 'Standby';
+        : runStatus === 'failed'
+          ? 'Run stopped before finishing'
+          : 'Standby';
 
   return (
     <section
