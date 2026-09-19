@@ -58,6 +58,15 @@ export const App: React.FC = () => {
   >({});
   const [liveVerdict, setLiveVerdict] = useState<Verdict | null>(null);
   const [reportsCount, setReportsCount] = useState<number>(0);
+  // Live counters from `stats` events. The run header is fetched once, so
+  // reading the panel from header.stats left LLM calls, tool calls and tokens
+  // at zero for the whole run even though the events carried real numbers.
+  const [liveStats, setLiveStats] = useState<{
+    llm_calls: number;
+    tool_calls: number;
+    tokens_in: number;
+    tokens_out: number;
+  } | null>(null);
   const [activeAgentSlug, setActiveAgentSlug] = useState<string | null>(null);
   const [tokenHistory, setTokenHistory] = useState<
     { elapsedSec: number; tokensIn: number; tokensOut: number }[]
@@ -95,6 +104,12 @@ export const App: React.FC = () => {
     let currentAgent: string | null = null;
     let currentIn = 0;
     let currentOut = 0;
+    let latestStats: {
+      llm_calls?: number;
+      tool_calls?: number;
+      tokens_in?: number;
+      tokens_out?: number;
+    } | null = null;
 
     const newAgents: Record<
       string,
@@ -138,6 +153,15 @@ export const App: React.FC = () => {
         if (e.payload?.complete) {
           repCount += 1;
         }
+      } else if (e.kind === 'stats') {
+        if (e.payload) {
+          latestStats = e.payload as {
+            llm_calls?: number;
+            tool_calls?: number;
+            tokens_in?: number;
+            tokens_out?: number;
+          };
+        }
       } else if (e.kind === 'verdict') {
         latestVerdict = e.payload as Verdict;
       } else if (e.kind === 'run_state') {
@@ -150,6 +174,14 @@ export const App: React.FC = () => {
 
     setAgentsState(newAgents);
     setReportsCount(repCount);
+    if (latestStats) {
+      setLiveStats({
+        llm_calls: latestStats.llm_calls ?? 0,
+        tool_calls: latestStats.tool_calls ?? 0,
+        tokens_in: latestStats.tokens_in ?? 0,
+        tokens_out: latestStats.tokens_out ?? 0,
+      });
+    }
     if (latestVerdict) {
       setLiveVerdict(latestVerdict);
     }
@@ -299,7 +331,7 @@ export const App: React.FC = () => {
             {/* Right column: Right rail */}
             <RightRail
               agents={roster}
-              stats={header?.stats}
+              stats={liveStats ?? header?.stats}
               header={header}
               reportsDone={reportsCount}
               totalReports={7}
