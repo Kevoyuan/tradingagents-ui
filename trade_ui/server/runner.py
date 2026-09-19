@@ -369,7 +369,6 @@ class StubRunner:
         finally:
             self.event_bus.close()
 
-
 class UpstreamRunner:
     """Runner delegating to upstream TradingAgents graph with cooperative cancellation."""
 
@@ -473,6 +472,7 @@ class UpstreamRunner:
                 last_slug: str | None = None
                 last_team: TeamName | None = None
                 last_text_by_agent: dict[str, str] = {}
+                last_stats_at = 0.0
 
                 def finish(slug: str) -> None:
                     if slug not in finished:
@@ -535,8 +535,19 @@ class UpstreamRunner:
                                 team=team,
                             )
 
+                    # Emit counters from the stats handler. Without this the
+                    # upstream path never published stats at all, so LLM calls,
+                    # tool calls, tokens and the burn chart sat at zero for the
+                    # whole run. Throttled because a long analysis yields a
+                    # chunk per node tick and this is only a display counter.
+                    now_mono = time.monotonic()
+                    if now_mono - last_stats_at >= 2.0:
+                        last_stats_at = now_mono
+                        self._publish_stats(stats_handler)
+
                 if last_slug is not None:
                     finish(last_slug)
+                self._publish_stats(stats_handler)
 
                 if cancelled or self.cancel_token.is_cancelled:
                     self.event_bus.publish(
@@ -578,3 +589,20 @@ class UpstreamRunner:
             self.on_header_update(self.header)
         finally:
             self.event_bus.close()
+
+
+    def _publish_stats(self, stats_handler) -> None:  # noqa: ANN001 - upstream handler
+        """Publish the live counters the run stats panel and burn chart read."""
+        try:
+            stats = stats_handler.get_stats() or {}
+        except Exception:
+            return
+        payload = {
+            "llm_calls": int(stats.get("llm_calls", 0) or 0),
+            "tool_calls": int(stats.get("tool_calls", 0) or 0),
+            "tokens_in": int(stats.get("tokens_in", 0) or 0),
+            "tokens_out": int(stats.get("tokens_out", 0) or 0),
+            "cost_usd": stats.get("cost_usd"),
+        }
+        self.event_bus.publish(kind="stats", payload=payload)
+        self.header.stats = payload

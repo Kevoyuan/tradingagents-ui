@@ -80,7 +80,14 @@ def _run_upstream(monkeypatch, tmp_path: Path) -> _Bus:
         sys.modules,
         "cli.stats_handler",
         SimpleNamespace(
-            StatsCallbackHandler=lambda: SimpleNamespace(get_stats=lambda: {})
+            StatsCallbackHandler=lambda: SimpleNamespace(
+                get_stats=lambda: {
+                    "llm_calls": 3,
+                    "tool_calls": 2,
+                    "tokens_in": 1500,
+                    "tokens_out": 800,
+                }
+            )
         ),
     )
 
@@ -136,3 +143,15 @@ def test_tool_node_message_attributes_to_the_agent_that_spoke_last(
     ]
     assert len(tool_msg) == 1
     assert tool_msg[0]["agent"] == "market"
+
+
+def test_upstream_run_publishes_stats(monkeypatch, tmp_path: Path) -> None:
+    """The upstream path published no stats at all, so LLM calls, tool calls,
+    tokens and the burn chart stayed at zero for an entire real run."""
+    bus = _run_upstream(monkeypatch, tmp_path)
+    stats = [e for e in bus.events if e["kind"] == "stats"]
+    assert stats, "upstream run must publish stats events"
+    assert stats[-1]["payload"]["llm_calls"] == 3
+    assert stats[-1]["payload"]["tool_calls"] == 2
+    assert stats[-1]["payload"]["tokens_in"] == 1500
+    assert stats[-1]["payload"]["tokens_out"] == 800
