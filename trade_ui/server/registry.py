@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import time
 import uuid
 from datetime import datetime, timezone
 
@@ -59,6 +60,40 @@ class RunRegistry:
         self.runs_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self.active_run: ActiveRun | None = None
+        self._reconcile_orphaned_runs()
+
+    def _reconcile_orphaned_runs(self) -> None:
+        """Close out runs left mid-flight by a previous server process.
+
+        A run only exists inside the process that started it. When the server
+        restarts, any run.json still marked running or pending is a zombie: it
+        will never finish and never emit another event. The frontend prefers a
+        running run when choosing what to display, so a single zombie would
+        hijack the Monitor permanently - which is exactly what happened, the
+        UI sat on a dead run from a previous process while the user pressed
+        Start and nothing moved.
+        """
+        if not self.runs_dir.is_dir():
+            return
+        for child in self.runs_dir.iterdir():
+            run_file = child / "run.json"
+            if not run_file.is_file():
+                continue
+            try:
+                header = RunHeader.model_validate_json(run_file.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if header.status in ("running", "pending"):
+                header.status = "failed"
+                header.completed_at = header.completed_at or time.strftime(
+                    "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
+                )
+                # Persist inline rather than via _save_header, which takes the
+                # lock and is not yet safe to use from __init__.
+                try:
+                    run_file.write_text(header.model_dump_json(indent=2), encoding="utf-8")
+                except OSError:
+                    continue
 
     def has_active_run(self) -> bool:
         """Check whether a run is currently in progress."""
