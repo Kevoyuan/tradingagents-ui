@@ -59,31 +59,43 @@ class _Adapter:
 
 
 def _run_upstream(monkeypatch, tmp_path: Path) -> _Bus:
+    import contextlib
     import sys
 
-    import trade_ui.server.runner as runner_mod
+    import runtime_environment as runtime_env_mod
+    import trade_ui.server.run_config as run_config_mod
 
     bus = _Bus()
     header = RunHeader(run_id="r1", status="running", ticker="SNDK", trade_date="2026-09-19")
 
     # Bypass credential/config resolution; the subject under test is attribution.
+    # run() does `from trade_ui.server.run_config import resolve_run_config` inside
+    # the method, so patching that name on trade_ui.server.runner is never
+    # consulted. Resolution then fell through to the developer's real
+    # ~/.tradingagents/.env, and the suite only passed on a machine that had a
+    # key. Patch the module the local import actually reads from.
     monkeypatch.setattr(
-        runner_mod,
+        run_config_mod,
         "resolve_run_config",
         lambda *_a, **_k: SimpleNamespace(
-            upstream_config={}, env_values={}, provider="deepseek", missing_credentials=[]
+            provider="deepseek",
+            missing_credentials=[],
+            analysts=["market", "social", "news", "fundamentals"],
+            runtime_env_values={},
+            upstream_config={},
+            deep_model="stub-deep-model",
         ),
-        raising=False,
+    )
+    # temporary_environment is imported locally too, so it needs the same treatment.
+    monkeypatch.setattr(
+        runtime_env_mod,
+        "temporary_environment",
+        lambda *_a, **_k: contextlib.nullcontext(),
     )
     # run() imports the adapter locally, so patch it on its own module.
     import tradingagents_adapter as adapter_mod
 
     monkeypatch.setattr(adapter_mod, "TradingAgentsAdapter", _Adapter, raising=True)
-    monkeypatch.setattr(
-        runner_mod, "temporary_environment", lambda *_a, **_k: SimpleNamespace(
-            __enter__=lambda s: None, __exit__=lambda s, *a: None
-        ), raising=False,
-    )
     monkeypatch.setitem(
         sys.modules,
         "tradingagents.graph.trading_graph",
@@ -110,6 +122,8 @@ def _run_upstream(monkeypatch, tmp_path: Path) -> _Bus:
         event_bus=bus,
         cancel_token=_Token(),
         on_header_update=lambda _h: None,
+        # Keep the report tree out of the real ~/.tradingagents/logs.
+        logs_dir=tmp_path,
     )
     runner.run()
     return bus
